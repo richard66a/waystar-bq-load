@@ -341,6 +341,44 @@ def run_scheduled_etl(request):
 
 
 # =============================================================================
+# Monitoring Alert (HTTP-triggered)
+# =============================================================================
+
+@functions_framework.http
+def run_monitoring_alert(request):
+    """
+    HTTP-triggered function to read the latest pipeline_monitoring snapshot
+    and emit a log entry if status='ALERT'. Intended for Cloud Scheduler.
+    """
+    bq_client = bigquery.Client(project=PROJECT_ID)
+    query = f"""
+        SELECT status, details
+        FROM `{PROJECT_ID}.{DATASET_ID}.pipeline_monitoring`
+        ORDER BY check_time DESC
+        LIMIT 1
+    """
+
+    try:
+        rows = list(bq_client.query(query).result())
+        if not rows:
+            logger.warning("PIPELINE_ALERT no monitoring rows found")
+            return ({"status": "NO_ROWS"}, 200)
+
+        status = rows[0].get("status")
+        details = rows[0].get("details")
+
+        if status == "ALERT":
+            logger.error(f"PIPELINE_ALERT status=ALERT details={details}")
+            return ({"status": "ALERT", "details": details}, 200)
+
+        logger.info(f"PIPELINE_ALERT status=OK details={details}")
+        return ({"status": "OK", "details": details}, 200)
+    except Exception as exc:
+        logger.error(f"PIPELINE_ALERT monitoring check failed: {exc}")
+        return ({"status": "FAILED", "error": str(exc)}, 500)
+
+
+# =============================================================================
 # Local Testing Entry Point
 # =============================================================================
 

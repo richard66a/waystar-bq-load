@@ -96,25 +96,24 @@ WHERE
     AND TRIM(ext.data) != '';
 
 -- =============================================================================
--- STEP 4: Mark files as processed
+-- STEP 4: Mark files as processed (idempotent)
 -- =============================================================================
-INSERT INTO `sbox-ravelar-001-20250926.logviewer.processed_files`
-(
-    gcs_uri,
-    originating_filename,
-    processed_timestamp,
-    rows_loaded,
-    status
-)
-SELECT
-    nf.file_path AS gcs_uri,
-    nf.originating_filename,
-    CURRENT_TIMESTAMP() AS processed_timestamp,
-    (
-        SELECT COUNT(*)
-        FROM `sbox-ravelar-001-20250926.logviewer.base_ftplog` b
-        WHERE b.gcs_uri = nf.file_path
-          AND b.load_time_dt >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 1 HOUR)
-    ) AS rows_loaded,
-    'SUCCESS' AS status
-FROM _new_files nf;
+MERGE `sbox-ravelar-001-20250926.logviewer.processed_files` AS target
+USING (
+    SELECT
+        nf.file_path AS gcs_uri,
+        nf.originating_filename,
+        CURRENT_TIMESTAMP() AS processed_timestamp,
+        (
+            SELECT COUNT(*)
+            FROM `sbox-ravelar-001-20250926.logviewer.base_ftplog` b
+            WHERE b.gcs_uri = nf.file_path
+              AND b.load_time_dt >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 1 HOUR)
+        ) AS rows_loaded,
+        'SUCCESS' AS status
+    FROM _new_files nf
+) AS source
+ON target.gcs_uri = source.gcs_uri
+WHEN NOT MATCHED THEN
+  INSERT (gcs_uri, originating_filename, processed_timestamp, rows_loaded, status)
+  VALUES (source.gcs_uri, source.originating_filename, source.processed_timestamp, source.rows_loaded, source.status);

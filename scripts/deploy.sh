@@ -145,8 +145,12 @@ if [ -n "${EXISTING_QUERY}" ]; then
     log_info "Scheduled query already exists: ${SCHEDULED_QUERY_NAME}"
     log_info "To update, delete and recreate: bq rm -f --transfer_config ${EXISTING_QUERY}"
 else
-    # Create the scheduled query using the multi-statement SQL with real newlines
+    # Create the scheduled query using either DML script or stored procedure CALL
     QUERY_FILE="${SCRIPT_DIR}/../sql/06_scheduled_query_etl_scheduled.sql"
+    if [ "${USE_CALL_PROCEDURE:-false}" = "true" ]; then
+        QUERY_FILE="${SCRIPT_DIR}/../sql/06_scheduled_query_call.sql"
+        log_info "Using stored procedure CALL for scheduled query body"
+    fi
     PARAMS=$(python3 - <<PY
 import json
 from pathlib import Path

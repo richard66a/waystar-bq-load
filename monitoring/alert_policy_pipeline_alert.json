@@ -1,0 +1,26 @@
+{
+  "displayName": "FTPlog Pipeline Alerts",
+  "combiner": "OR",
+  "conditions": [
+    {
+      "displayName": "PIPELINE_ALERT logs",
+      "conditionThreshold": {
+        "filter": "resource.type=\"cloud_run_revision\" AND metric.type=\"logging.googleapis.com/user/ftplog_pipeline_alerts\"",
+        "comparison": "COMPARISON_GT",
+        "thresholdValue": 0,
+        "duration": "0s",
+        "trigger": {"count": 1},
+        "aggregations": [
+          {
+            "alignmentPeriod": "60s",
+            "perSeriesAligner": "ALIGN_RATE"
+          }
+        ]
+      }
+    }
+  ],
+  "documentation": {
+    "content": "Pipeline monitoring status reported ALERT. Check BigQuery table logviewer.pipeline_monitoring and recent Cloud Function logs for details.",
+    "mimeType": "text/markdown"
+  }
+}

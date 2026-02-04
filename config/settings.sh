@@ -60,6 +60,13 @@ export SCHEDULED_ETL_FUNCTION_NAME="process-ftplog-etl"
 export CLOUD_SCHEDULER_JOB_NAME="ftplog-etl-every-5m"
 
 # -----------------------------------------------------------------------------
+# Monitoring Alert (Cloud Scheduler + HTTP Function)
+# -----------------------------------------------------------------------------
+export MONITORING_ALERT_FUNCTION_NAME="process-ftplog-monitoring"
+export MONITORING_ALERT_SCHEDULER_JOB_NAME="ftplog-monitoring-alerts-every-5m"
+export MONITORING_ALERT_METRIC_NAME="ftplog_pipeline_alerts"
+
+# -----------------------------------------------------------------------------
 # Derived Fully Qualified Table Names
 # -----------------------------------------------------------------------------
 export FQ_DATASET="${PROJECT_ID}.${DATASET_ID}"

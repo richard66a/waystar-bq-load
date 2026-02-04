@@ -1,27 +1,26 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# create_scheduled_query.sh
-# Builds the JSON params for a scheduled query using the SQL in sql/06_scheduled_query_etl.sql
-# and either prints the exact `bq mk` command to run or executes it (if --apply is passed).
+# create_monitoring_scheduled_query.sh
+# Builds the JSON params for a monitoring scheduled query using
+# sql/07_pipeline_monitoring_insert.sql and either prints the exact
+# `bq mk` command to run or executes it (if --apply is passed).
 
-SQL_FILE="$(dirname "$0")/../sql/06_scheduled_query_etl_scheduled.sql"
-CALL_SQL_FILE="$(dirname "$0")/../sql/06_scheduled_query_call.sql"
+SQL_FILE="$(dirname "$0")/../sql/07_pipeline_monitoring_insert.sql"
 PROJECT="sbox-ravelar-001-20250926"
 DATASET="logviewer"
-DISPLAY_NAME="FTPlog ETL (every 5m)"
+DISPLAY_NAME="FTPlog Pipeline Monitoring (every 5m)"
 SCHEDULE="every 5 minutes"
 
 usage(){
   cat <<EOF
-Usage: $0 [--project PROJECT] [--dataset DATASET] [--display-name NAME] [--schedule SCHEDULE] [--call-proc] [--apply]
+Usage: $0 [--project PROJECT] [--dataset DATASET] [--display-name NAME] [--schedule SCHEDULE] [--apply]
 
 Options:
   --project       GCP project id (default: ${PROJECT})
   --dataset       BigQuery dataset for the scheduled query (default: ${DATASET})
   --display-name  Friendly name for the scheduled query (default: "${DISPLAY_NAME}")
   --schedule      Schedule string (default: "${SCHEDULE}")
-  --call-proc     Use stored procedure CALL body instead of DML script
   --apply         Execute the generated `bq mk` command. Without --apply the command is printed only.
 
 Example:
@@ -32,33 +31,24 @@ EOF
 }
 
 APPLY=false
-USE_CALL=false
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --project) PROJECT="$2"; shift 2;;
     --dataset) DATASET="$2"; shift 2;;
     --display-name) DISPLAY_NAME="$2"; shift 2;;
     --schedule) SCHEDULE="$2"; shift 2;;
-    --call-proc) USE_CALL=true; shift 1;;
     --apply) APPLY=true; shift 1;;
     -h|--help) usage;;
     *) echo "Unknown arg: $1"; usage;;
   esac
 done
 
-if [ "$USE_CALL" = true ]; then
-  SQL_FILE="$CALL_SQL_FILE"
-fi
-
 if [[ ! -f "$SQL_FILE" ]]; then
   echo "SQL file not found: $SQL_FILE" >&2
   exit 2
 fi
 
-# Read SQL with real newlines to preserve script structure
 SQL_CONTENT=$(cat "$SQL_FILE")
-
-# Build params JSON using jq to ensure proper escaping (no write_disposition for DML script)
 PARAMS=$(jq -nc --arg q "$SQL_CONTENT" '{query: $q}')
 
 CMD=(bq mk --transfer_config --project_id="$PROJECT" --data_source=scheduled_query \

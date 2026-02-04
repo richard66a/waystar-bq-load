@@ -131,7 +131,10 @@ ftplog-pipeline/
 │   ├── 05_create_external_table.sql # External table
 │   ├── 06_scheduled_query_etl.sql # Main ETL query
 │   ├── 06_scheduled_query_etl_scheduled.sql # DML-only scheduled ETL
+│   ├── 06_scheduled_query_call.sql # Scheduled query CALL body
 │   ├── 06_scheduled_query_proc.sql # Stored procedure (optional)
+│   ├── 07_create_monitoring_table.sql # Monitoring snapshot table
+│   ├── 07_pipeline_monitoring_insert.sql # Monitoring snapshot insert
 │   ├── validation_queries.sql   # Data validation
 │   ├── runbook_reprocessing.sql # Reprocessing scenarios
 │   └── runbook_monitoring.sql   # Monitoring queries
@@ -140,7 +143,10 @@ ftplog-pipeline/
 │   ├── run_etl.sh              # Manual ETL execution
 │   ├── teardown.sh             # Cleanup resources
 │   └── deploy_cloud_function.sh # Alternative deployment
-│   └── deploy_scheduled_etl.sh  # Cloud Scheduler + HTTP function
+│   ├── deploy_scheduled_etl.sh  # Cloud Scheduler + HTTP function
+│   ├── create_scheduled_query.sh # Scheduled query creator
+│   ├── create_monitoring_scheduled_query.sh # Monitoring scheduled query
+│   └── deploy_monitoring_alerts.sh # Monitoring alerting deployment
 ├── cloud_function/
 │   ├── main.py                 # Cloud Function code
 │   ├── etl_sql.sql              # ETL script for HTTP function
@@ -161,13 +167,10 @@ ftplog-pipeline/
 # Deploy all infrastructure
 ./scripts/deploy.sh
 
-# Create scheduled query in BigQuery Console:
-# 1. Go to BigQuery > Scheduled Queries
-# 2. Create new query using sql/06_scheduled_query_etl.sql
-# 3. Schedule: every 5 minutes
-#
-# Note: In this environment, scheduled queries reject multi-statement scripts
-# with DML/DDL. Use Option C below for a reliable 5-minute schedule.
+# Preferred: create scheduled query that CALLs the stored procedure
+./scripts/create_scheduled_query.sh --call-proc --apply
+
+# If scheduled-query creation rejects the CALL payload, use Option C below.
 ```
 
 ### Option B: Cloud Function (Real-time)
@@ -244,8 +247,21 @@ FROM \`sbox-ravelar-001-20250926.logviewer.base_ftplog\`"
 ### Monitoring
 
 ```bash
-# Pipeline health dashboard
+# Pipeline health dashboard (ad-hoc)
 bq query --use_legacy_sql=false < sql/runbook_monitoring.sql
+
+# Scheduled monitoring snapshots (writes to logviewer.pipeline_monitoring)
+./scripts/create_monitoring_scheduled_query.sh --apply
+
+# Deploy monitoring alerting (Cloud Function + Scheduler + Cloud Monitoring policy)
+./scripts/deploy_monitoring_alerts.sh
+
+# Latest health snapshot
+bq query --use_legacy_sql=false "
+SELECT *
+FROM `sbox-ravelar-001-20250926.logviewer.pipeline_monitoring`
+ORDER BY check_time DESC
+LIMIT 5"
 ```
 
 Key metrics to monitor:
