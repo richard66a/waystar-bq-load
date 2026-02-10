@@ -30,6 +30,14 @@ CREATE TABLE IF NOT EXISTS `sbox-ravelar-001-20250926.logviewer.processed_files`
     -- Number of rows successfully loaded from this file
     rows_loaded INT64 
         OPTIONS(description = 'Number of rows loaded from this file'),
+
+    -- Number of non-empty rows discovered for this file
+    rows_expected INT64 
+        OPTIONS(description = 'Number of non-empty rows discovered for this file'),
+
+    -- Rows not loaded (rows_expected - rows_loaded)
+    parse_errors INT64 
+        OPTIONS(description = 'Number of rows not loaded (rows_expected - rows_loaded)'),
     
     -- Processing status for error tracking
     -- SUCCESS: All rows processed
@@ -53,6 +61,13 @@ OPTIONS (
         ('purpose', 'idempotency')
     ]
 );
+
+-- Ensure schema is updated if the table already exists
+ALTER TABLE `sbox-ravelar-001-20250926.logviewer.processed_files`
+ADD COLUMN IF NOT EXISTS rows_expected INT64 OPTIONS(description = 'Number of non-empty rows discovered for this file');
+
+ALTER TABLE `sbox-ravelar-001-20250926.logviewer.processed_files`
+ADD COLUMN IF NOT EXISTS parse_errors INT64 OPTIONS(description = 'Number of rows not loaded (rows_expected - rows_loaded)');
 
 -- Create a unique constraint simulation using a view
 -- (BigQuery doesn't support true unique constraints, but we check in ETL)

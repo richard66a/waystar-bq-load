@@ -24,6 +24,7 @@ SELECT
     COUNTIF(status = 'FAILED') AS failed,
     COUNTIF(status = 'PARTIAL') AS partial,
     SUM(rows_loaded) AS total_rows_loaded,
+    SUM(parse_errors) AS total_parse_errors,
     AVG(rows_loaded) AS avg_rows_per_file
 FROM `sbox-ravelar-001-20250926.logviewer.processed_files`
 WHERE processed_timestamp >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 24 HOUR);
@@ -52,11 +53,34 @@ SELECT
     originating_filename,
     processed_timestamp,
     rows_loaded,
+    rows_expected,
+    parse_errors,
     status,
     TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), processed_timestamp, MINUTE) AS minutes_ago
 FROM `sbox-ravelar-001-20250926.logviewer.processed_files`
 ORDER BY processed_timestamp DESC
 LIMIT 10;
+
+
+-- -----------------------------------------------------------------------------
+-- 1.4 Files With Parse Errors or Non-SUCCESS Status
+-- Surfaces files that need investigation
+-- -----------------------------------------------------------------------------
+SELECT
+    'Files With Parse Errors' AS report,
+    gcs_uri,
+    originating_filename,
+    processed_timestamp,
+    rows_expected,
+    rows_loaded,
+    parse_errors,
+    status,
+    error_message
+FROM `sbox-ravelar-001-20250926.logviewer.processed_files`
+WHERE status != 'SUCCESS'
+   OR parse_errors > 0
+ORDER BY processed_timestamp DESC
+LIMIT 50;
 
 
 -- =============================================================================
@@ -72,7 +96,9 @@ DECLARE test_file STRING DEFAULT 'gs://sbox-ravelar-001-20250926-ftplog/logs/FTP
 
 SELECT 
     'Row Count Validation' AS check_name,
+    (SELECT rows_expected FROM `sbox-ravelar-001-20250926.logviewer.processed_files` WHERE gcs_uri = test_file) AS expected_rows,
     (SELECT rows_loaded FROM `sbox-ravelar-001-20250926.logviewer.processed_files` WHERE gcs_uri = test_file) AS tracked_rows,
+    (SELECT parse_errors FROM `sbox-ravelar-001-20250926.logviewer.processed_files` WHERE gcs_uri = test_file) AS parse_errors,
     (SELECT COUNT(*) FROM `sbox-ravelar-001-20250926.logviewer.base_ftplog` WHERE gcs_uri = test_file) AS base_table_rows,
     (SELECT COUNT(*) FROM `sbox-ravelar-001-20250926.logviewer.archive_ftplog` WHERE gcs_uri = test_file) AS archive_rows;
 
@@ -132,15 +158,15 @@ LIMIT 10;
 -- -----------------------------------------------------------------------------
 SELECT 
     'Duplicate Row Check (by hash)' AS check_name,
-    hash_code,
-    COUNT(*) AS occurrences
+        COALESCE(hash_fingerprint, CAST(hash_code AS STRING)) AS dedupe_key,
+        COUNT(*) AS occurrences
 FROM `sbox-ravelar-001-20250926.logviewer.base_ftplog`
 WHERE load_time_dt >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 24 HOUR)
-  AND hash_code IS NOT NULL
-GROUP BY hash_code
+    AND (hash_fingerprint IS NOT NULL OR hash_code IS NOT NULL)
+GROUP BY dedupe_key
 HAVING COUNT(*) > 1
 ORDER BY occurrences DESC
-LIMIT 10;
+LIMIT 20;
 
 
 -- =============================================================================

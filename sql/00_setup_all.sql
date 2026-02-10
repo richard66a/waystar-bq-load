@@ -52,6 +52,8 @@ CREATE TABLE IF NOT EXISTS `sbox-ravelar-001-20250926.logviewer.base_ftplog`
         OPTIONS(description = 'File path or "-" for non-file operations'),
     hash_code INT64 
         OPTIONS(description = 'Computed hash for row-level deduplication'),
+    hash_fingerprint STRING 
+        OPTIONS(description = 'Deterministic SHA256 hex fingerprint for row deduplication'),
     ip_address STRING 
         OPTIONS(description = 'Client IP address'),
     partner_name STRING 
@@ -109,6 +111,10 @@ CREATE TABLE IF NOT EXISTS `sbox-ravelar-001-20250926.logviewer.processed_files`
         OPTIONS(description = 'When file was processed'),
     rows_loaded INT64 
         OPTIONS(description = 'Number of rows loaded from this file'),
+    rows_expected INT64 
+        OPTIONS(description = 'Number of non-empty rows discovered for this file'),
+    parse_errors INT64 
+        OPTIONS(description = 'Number of rows not loaded (rows_expected - rows_loaded)'),
     status STRING 
         OPTIONS(description = 'Processing status: SUCCESS, FAILED, PARTIAL'),
     error_message STRING 
@@ -120,6 +126,16 @@ OPTIONS (
     description = 'Tracks processed GCS files to prevent duplicate loading',
     labels = [('table_type', 'tracking'), ('purpose', 'idempotency')]
 );
+
+-- Ensure schema is updated if the table already exists
+ALTER TABLE `sbox-ravelar-001-20250926.logviewer.processed_files`
+ADD COLUMN IF NOT EXISTS rows_expected INT64 OPTIONS(description = 'Number of non-empty rows discovered for this file');
+
+ALTER TABLE `sbox-ravelar-001-20250926.logviewer.processed_files`
+ADD COLUMN IF NOT EXISTS parse_errors INT64 OPTIONS(description = 'Number of rows not loaded (rows_expected - rows_loaded)');
+
+ALTER TABLE `sbox-ravelar-001-20250926.logviewer.base_ftplog`
+ADD COLUMN IF NOT EXISTS hash_fingerprint STRING OPTIONS(description = 'Deterministic SHA256 hex fingerprint for row deduplication');
 
 -- =====================================================================
 -- STEP 5: Create External Table
