@@ -73,16 +73,40 @@ FILE_PATTERN = rf"^{re.escape(GCS_LOGS_PREFIX)}/.*\.json$"
 # =============================================================================
 
 def extract_originating_filename(gcs_uri: str) -> str:
-    """Extract the filename (without extension) from GCS URI."""
+    """Extract the originating filename (without extension) from a GCS URI.
+
+    Args:
+        gcs_uri: Full GCS URI or path component (for example,
+            "gs://bucket/logs/myfile.json" or "logs/myfile.json").
+
+    Returns:
+        The filename without the ``.json`` extension if present, otherwise
+        the string ``"unknown"``.
+
+    Examples:
+        >>> extract_originating_filename('gs://bucket/logs/foo.json')
+        'foo'
+    """
     match = re.search(r'/([^/]+)\.json$', gcs_uri)
     return match.group(1) if match else "unknown"
 
 
 def parse_event_timestamp(event_dt_str: Optional[str]) -> Optional[datetime]:
-    """Parse ISO 8601 timestamp from JSON."""
+    """Parse an ISO 8601 timestamp string into a ``datetime`` object.
+
+    The function handles several common ISO 8601 variants with and without
+    fractional seconds and trailing ``Z`` UTC designator. If the input is
+    falsy or cannot be parsed, ``None`` is returned.
+
+    Args:
+        event_dt_str: Timestamp string (example: ``"2026-01-28T10:30:00.000Z"``)
+
+    Returns:
+        A ``datetime`` instance when parsing succeeds, otherwise ``None``.
+    """
     if not event_dt_str:
         return None
-    
+
     # Handle various ISO 8601 formats
     formats = [
         "%Y-%m-%dT%H:%M:%S",
@@ -90,19 +114,29 @@ def parse_event_timestamp(event_dt_str: Optional[str]) -> Optional[datetime]:
         "%Y-%m-%dT%H:%M:%SZ",
         "%Y-%m-%dT%H:%M:%S.%fZ",
     ]
-    
+
     for fmt in formats:
         try:
             return datetime.strptime(event_dt_str, fmt)
         except ValueError:
             continue
-    
+
     logger.warning(f"Could not parse timestamp: {event_dt_str}")
     return None
 
 
 def safe_int(value: Any) -> Optional[int]:
-    """Safely convert value to int."""
+    """Safely convert a value to an ``int`` when possible.
+
+    This helper returns ``None`` if the input is ``None`` or cannot be
+    converted to an integer (for example, non-numeric strings).
+
+    Args:
+        value: Value to convert (may be ``str``, ``int``, or other).
+
+    Returns:
+        The converted integer, or ``None`` if conversion failed.
+    """
     if value is None:
         return None
     try:
@@ -112,7 +146,20 @@ def safe_int(value: Any) -> Optional[int]:
 
 
 def compute_hash_fingerprint(data: Dict[str, Any]) -> str:
-    """Compute deterministic SHA256 hex fingerprint from canonical fields."""
+    """Compute a deterministic SHA256 hex fingerprint from canonical fields.
+
+    The fingerprint is computed by concatenating selected JSON fields in a
+    deterministic order with a ``|`` separator and hashing the result using
+    SHA256. This fingerprint is used for row-level deduplication in the
+    ETL pipeline.
+
+    Args:
+        data: Parsed JSON object (dictionary) containing keys such as
+            ``EventDt``, ``Source``, ``Filename``, ``Bytes``, and ``UserName``.
+
+    Returns:
+        Hexadecimal SHA256 fingerprint string.
+    """
     canonical = "|".join([
         str(data.get("EventDt") or ""),
         str(data.get("Source") or ""),
@@ -124,11 +171,25 @@ def compute_hash_fingerprint(data: Dict[str, Any]) -> str:
 
 
 def parse_json_line(line: str, gcs_uri: str, originating_filename: str) -> Tuple[Optional[Dict], Dict]:
-    """
-    Parse a single JSON line into base table row and archive row.
-    
+    """Parse a single NDJSON line and produce rows for base and archive tables.
+
+    The function always returns an ``archive_row`` containing the original
+    raw JSON and metadata. If the JSON line can be parsed and contains
+    expected fields, a structured ``base_row`` dictionary is also returned.
+    On JSON parse failure, ``base_row`` is ``None`` and only the
+    ``archive_row`` is provided.
+
+    Args:
+        line: A single line of NDJSON (string).
+        gcs_uri: The full GCS URI for the source file.
+        originating_filename: The extracted filename (without extension) used
+            as a load identifier.
+
     Returns:
-        Tuple of (base_row, archive_row) where base_row may be None if parsing fails
+        A tuple ``(base_row, archive_row)`` where ``base_row`` is a mapping
+        suitable for insertion into ``base_ftplog`` (or ``None`` on parse
+        failure), and ``archive_row`` is a mapping suitable for
+        insertion into ``archive_ftplog``.
     """
     load_time = datetime.utcnow()
     
@@ -177,7 +238,20 @@ def parse_json_line(line: str, gcs_uri: str, originating_filename: str) -> Tuple
 
 
 def is_already_processed(client: bigquery.Client, gcs_uri: str) -> bool:
-    """Check if file has already been processed."""
+    """Return whether a given GCS URI has already been recorded as processed.
+
+    This helper queries the ``processed_files`` ledger (``FQ_PROCESSED_TABLE``)
+    to determine idempotency for a particular file. It performs a parameterized
+    BigQuery query to avoid injection and to be efficient at scale.
+
+    Args:
+        client: An initialized ``google.cloud.bigquery.Client`` for queries.
+        gcs_uri: Full GCS URI of the file to check.
+
+    Returns:
+        ``True`` if an entry exists for the provided ``gcs_uri``, otherwise
+        ``False``.
+    """
     query = f"""
         SELECT 1 FROM `{FQ_PROCESSED_TABLE}`
         WHERE gcs_uri = @gcs_uri
@@ -199,27 +273,54 @@ def load_to_bigquery(
     gcs_uri: str,
     originating_filename: str
 ) -> str:
-    """Load parsed data into BigQuery tables."""
+    """Insert parsed rows into BigQuery and record processing metadata.
+
+    The function performs three actions in sequence:
+    1. Insert structured rows into the ``base`` table (if any).
+    2. Insert raw rows into the ``archive`` table (if any).
+    3. Write a summary row into the ``processed_files`` ledger recording
+       counts, status and processing duration.
+
+    On any insertion error into the primary tables, an exception is raised to
+    allow the caller to handle retries and error recording.
+
+    Args:
+        client: Initialized ``google.cloud.bigquery.Client`` used to insert
+            and write the processed_files ledger.
+        base_rows: List of structured rows to insert into ``base_ftplog``.
+        archive_rows: List of raw JSON rows to insert into ``archive_ftplog``.
+        gcs_uri: Full GCS URI of the processed file.
+        originating_filename: Filename identifier used in the processed_files
+            ledger.
+
+    Returns:
+        A string status value ("SUCCESS", "PARTIAL", or "FAILED")
+        describing the outcome.
+
+    Raises:
+        Exception: If inserts into the base or archive tables fail, or if the
+            processed_files ledger insert fails.
+    """
     start_time = datetime.utcnow()
-    
+
     # Insert into base table
     if base_rows:
         errors = client.insert_rows_json(FQ_BASE_TABLE, base_rows)
         if errors:
             logger.error(f"Base table insert errors: {errors}")
             raise Exception(f"Failed to insert into base table: {errors}")
-    
+
     # Insert into archive table
     if archive_rows:
         errors = client.insert_rows_json(FQ_ARCHIVE_TABLE, archive_rows)
         if errors:
             logger.error(f"Archive table insert errors: {errors}")
             raise Exception(f"Failed to insert into archive table: {errors}")
-    
+
     # Calculate processing duration
     end_time = datetime.utcnow()
     duration_seconds = (end_time - start_time).total_seconds()
-    
+
     # Record in processed_files
     rows_expected = len(archive_rows)
     rows_loaded = len(base_rows)
@@ -246,12 +347,12 @@ def load_to_bigquery(
         "error_message": error_message,
         "processing_duration_seconds": duration_seconds,
     }]
-    
+
     errors = client.insert_rows_json(FQ_PROCESSED_TABLE, processed_row)
     if errors:
         logger.error(f"Processed files insert errors: {errors}")
         raise Exception(f"Failed to record processed file: {errors}")
-    
+
     return status
 
 
@@ -262,9 +363,28 @@ def load_to_bigquery(
 @functions_framework.cloud_event
 def process_ftplog(cloud_event):
     """
-    Cloud Function triggered by GCS object finalize event.
-    
-    Processes new NDJSON files and loads data into BigQuery.
+    Cloud Function entry point for GCS "object finalize" events.
+
+    This function is executed when a new object is finalized in the configured
+    GCS bucket. It performs the following steps:
+    1. Validates the object path matches the configured file pattern.
+    2. Skips placeholders and already-processed files (idempotency check).
+    3. Downloads the NDJSON content, parses each line and builds rows for
+       both the structured ``base`` table and the raw ``archive`` table.
+    4. Calls ``load_to_bigquery`` to persist rows and record processing
+       metadata in ``processed_files``.
+
+    Any insert errors into BigQuery cause the function to attempt to record
+    a failure row in the ``processed_files`` table before re-raising the
+    exception so that Cloud Functions/Cloud Logging can surface the failure.
+
+    Args:
+        cloud_event: The CloudEvents v1 payload delivered by Cloud Functions
+            for storage events (dictionary-like with keys ``bucket`` and
+            ``name``).
+
+    Returns:
+        None. Successful processing is logged; failures raise exceptions.
     """
     data = cloud_event.data
     bucket = data["bucket"]
