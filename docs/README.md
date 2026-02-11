@@ -1,46 +1,31 @@
-# FTP Log Pipeline — Documentation
+# FTP Log Pipeline Documentation
 
-This folder is the canonical documentation set for the GCP‑native FTP log pipeline.
+This folder contains the documentation for the GCP-native FTP log pipeline.
 
 ## Quick Links
 
-- Ops validation runbook: [runbook_ops_validation.md](runbook_ops_validation.md)
-- Implementation plan: [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md)
-- PR checklist: [PR_CHECKLIST.md](PR_CHECKLIST.md)
-- Deployment checklist: [DEPLOYMENT_CHECKLIST.md](DEPLOYMENT_CHECKLIST.md)
-- Upstream .NET changes: [DOTNET_UPSTREAM_CHANGES.md](DOTNET_UPSTREAM_CHANGES.md)
-- Scheduled query & IAM: [SCHEDULED_QUERY_IAM.md](SCHEDULED_QUERY_IAM.md)
-- Validation guide: [VALIDATION.md](VALIDATION.md)
-- Monitoring runbook (SQL): [../sql/runbook_monitoring.sql](../sql/runbook_monitoring.sql)
-- Reprocessing runbook (SQL): [../sql/runbook_reprocessing.sql](../sql/runbook_reprocessing.sql)
-- Validation queries: [../sql/validation_queries.sql](../sql/validation_queries.sql)
-- ETL procedure: [../sql/06_scheduled_query_proc.sql](../sql/06_scheduled_query_proc.sql)
-- ETL script (scheduled): [../sql/06_scheduled_query_etl_scheduled.sql](../sql/06_scheduled_query_etl_scheduled.sql)
+| Document | Description |
+|----------|-------------|
+| [ARCHITECTURE.md](ARCHITECTURE.md) | System design, data flow, and table schemas |
+| [DEPLOYMENT.md](DEPLOYMENT.md) | Setup, configuration, and deployment steps |
+| [OPERATIONS.md](OPERATIONS.md) | Monitoring, reprocessing, and troubleshooting |
+| [TESTING.md](TESTING.md) | Running tests, generating test data, validation |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Development workflow, code standards, PR checklist |
+
+## SQL References
+
+| File | Purpose |
+|------|---------|
+| [../sql/00_setup_all.sql](../sql/00_setup_all.sql) | Combined setup script |
+| [../sql/06_scheduled_query_proc.sql](../sql/06_scheduled_query_proc.sql) | ETL stored procedure |
+| [../sql/validation_queries.sql](../sql/validation_queries.sql) | Data validation queries |
+| [../sql/runbook_monitoring.sql](../sql/runbook_monitoring.sql) | Monitoring queries |
+| [../sql/runbook_reprocessing.sql](../sql/runbook_reprocessing.sql) | Reprocessing scenarios |
 
 ## Getting Started
 
-1) Copy the example config:
-- [config/example.settings.sh](../config/example.settings.sh) → config/settings.sh
+1. Read [ARCHITECTURE.md](ARCHITECTURE.md) to understand the system
+2. Follow [DEPLOYMENT.md](DEPLOYMENT.md) to set up your environment
+3. Use [TESTING.md](TESTING.md) to validate the pipeline
+4. Refer to [OPERATIONS.md](OPERATIONS.md) for ongoing maintenance
 
-2) Deploy resources:
-- [scripts/deploy.sh](../scripts/deploy.sh)
-
-3) Upload test data:
-- [tests/generate_test_data.py](../tests/generate_test_data.py)
-
-4) Run ETL:
-- [scripts/run_etl.sh](../scripts/run_etl.sh)
-
-5) Validate:
-- [sql/validation_queries.sql](../sql/validation_queries.sql)
-
-## What Changed Recently
-
-See [CHANGELOG.md](CHANGELOG.md) for the latest pipeline changes (diagnostics, fingerprinting, dedupe).
-
-## Reference
-
-- Scripts: [../scripts](../scripts)
-- SQL: [../sql](../sql)
-- Tests: [../tests](../tests)
-- Cloud Function (optional): [../cloud_function](../cloud_function)

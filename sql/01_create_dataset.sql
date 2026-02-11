@@ -12,7 +12,7 @@
 -- =============================================================================
 
 -- Create the logviewer dataset
-CREATE SCHEMA IF NOT EXISTS `sbox-ravelar-001-20250926.logviewer`
+CREATE SCHEMA IF NOT EXISTS `__PROJECT_ID__.__DATASET_ID__`
 OPTIONS (
     description = 'FTP log data - GCP-native pipeline migrated from Snowflake',
     location = 'US',
@@ -30,5 +30,5 @@ SELECT
     location,
     creation_time,
     last_modified_time
-FROM `sbox-ravelar-001-20250926.INFORMATION_SCHEMA.SCHEMATA`
+FROM `__PROJECT_ID__.INFORMATION_SCHEMA.SCHEMATA`
 WHERE schema_name = 'logviewer';

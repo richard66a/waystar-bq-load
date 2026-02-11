@@ -4,4 +4,4 @@
 -- Intended for BigQuery Scheduled Query execution if CALL is supported.
 -- =============================================================================
 
-CALL `sbox-ravelar-001-20250926.logviewer.proc_process_ftplog`();
+CALL `__PROJECT_ID__.__DATASET_ID__.proc_process_ftplog`();

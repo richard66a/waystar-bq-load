@@ -14,19 +14,19 @@
 
 SELECT
     CURRENT_TIMESTAMP() AS check_time,
-    (SELECT COUNT(*) FROM `sbox-ravelar-001-20250926.logviewer.processed_files`
+    (SELECT COUNT(*) FROM `__PROJECT_ID__.__DATASET_ID__.processed_files`
      WHERE processed_timestamp >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 1 HOUR)) AS files_processed_last_hour,
-    (SELECT COUNT(DISTINCT _FILE_NAME) FROM `sbox-ravelar-001-20250926.logviewer.external_ftplog_files`
+    (SELECT COUNT(DISTINCT _FILE_NAME) FROM `__PROJECT_ID__.__DATASET_ID__.external_ftplog_files`
      WHERE NOT EXISTS (
-         SELECT 1 FROM `sbox-ravelar-001-20250926.logviewer.processed_files` pf
+         SELECT 1 FROM `__PROJECT_ID__.__DATASET_ID__.processed_files` pf
          WHERE pf.gcs_uri = _FILE_NAME
      )) AS files_pending,
     CASE
-        WHEN (SELECT COUNT(*) FROM `sbox-ravelar-001-20250926.logviewer.processed_files`
+        WHEN (SELECT COUNT(*) FROM `__PROJECT_ID__.__DATASET_ID__.processed_files`
               WHERE processed_timestamp >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 1 HOUR)) = 0
-             AND (SELECT COUNT(DISTINCT _FILE_NAME) FROM `sbox-ravelar-001-20250926.logviewer.external_ftplog_files`
+             AND (SELECT COUNT(DISTINCT _FILE_NAME) FROM `__PROJECT_ID__.__DATASET_ID__.external_ftplog_files`
                   WHERE NOT EXISTS (
-                      SELECT 1 FROM `sbox-ravelar-001-20250926.logviewer.processed_files` pf
+                      SELECT 1 FROM `__PROJECT_ID__.__DATASET_ID__.processed_files` pf
                       WHERE pf.gcs_uri = _FILE_NAME
                   )) > 0
         THEN 'ALERT: Pipeline may be stuck!'
@@ -49,8 +49,8 @@ WITH file_ages AS (
             '%Y%m%d-%H%M%S',
             REGEXP_EXTRACT(ext._FILE_NAME, r'-(\d{8}-\d{6})')
         ) AS estimated_file_time
-    FROM `sbox-ravelar-001-20250926.logviewer.external_ftplog_files` ext
-    LEFT JOIN `sbox-ravelar-001-20250926.logviewer.processed_files` pf
+    FROM `__PROJECT_ID__.__DATASET_ID__.external_ftplog_files` ext
+    LEFT JOIN `__PROJECT_ID__.__DATASET_ID__.processed_files` pf
         ON pf.gcs_uri = ext._FILE_NAME
 )
 SELECT
@@ -86,7 +86,7 @@ SELECT
         THEN 'ALERT: Error rate exceeds 5%!'
         ELSE 'OK'
     END AS status
-FROM `sbox-ravelar-001-20250926.logviewer.processed_files`
+FROM `__PROJECT_ID__.__DATASET_ID__.processed_files`
 WHERE processed_timestamp >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 24 HOUR);
 
 
@@ -101,7 +101,7 @@ WITH daily_volumes AS (
         DATE(processed_timestamp) AS processing_date,
         COUNT(*) AS files,
         SUM(rows_loaded) AS rows
-    FROM `sbox-ravelar-001-20250926.logviewer.processed_files`
+    FROM `__PROJECT_ID__.__DATASET_ID__.processed_files`
     WHERE processed_timestamp >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 8 DAY)
     GROUP BY DATE(processed_timestamp)
 ),
@@ -141,9 +141,9 @@ WITH pending_files AS (
             '%Y%m%d-%H%M%S',
             REGEXP_EXTRACT(ext._FILE_NAME, r'-(\d{8}-\d{6})')
         ) AS estimated_file_time
-    FROM `sbox-ravelar-001-20250926.logviewer.external_ftplog_files` ext
+    FROM `__PROJECT_ID__.__DATASET_ID__.external_ftplog_files` ext
     WHERE NOT EXISTS (
-        SELECT 1 FROM `sbox-ravelar-001-20250926.logviewer.processed_files` pf
+        SELECT 1 FROM `__PROJECT_ID__.__DATASET_ID__.processed_files` pf
         WHERE pf.gcs_uri = ext._FILE_NAME
     )
 )
@@ -172,7 +172,7 @@ SELECT
     ROUND(size_bytes / 1024 / 1024 / 1024, 2) AS size_gb,
     row_count,
     TIMESTAMP_MILLIS(last_modified_time) AS last_modified
-FROM `sbox-ravelar-001-20250926.logviewer.__TABLES__`
+FROM `__PROJECT_ID__.__DATASET_ID__.__TABLES__`
 ORDER BY size_bytes DESC;
 
 
@@ -186,38 +186,38 @@ SELECT
     CURRENT_TIMESTAMP() AS generated_at,
     
     -- Processing stats (last 24h)
-    (SELECT COUNT(*) FROM `sbox-ravelar-001-20250926.logviewer.processed_files`
+    (SELECT COUNT(*) FROM `__PROJECT_ID__.__DATASET_ID__.processed_files`
      WHERE processed_timestamp >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 24 HOUR)) AS files_24h,
-    (SELECT SUM(rows_loaded) FROM `sbox-ravelar-001-20250926.logviewer.processed_files`
+    (SELECT SUM(rows_loaded) FROM `__PROJECT_ID__.__DATASET_ID__.processed_files`
      WHERE processed_timestamp >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 24 HOUR)) AS rows_24h,
     
     -- Current backlog
-    (SELECT COUNT(DISTINCT _FILE_NAME) FROM `sbox-ravelar-001-20250926.logviewer.external_ftplog_files`
+    (SELECT COUNT(DISTINCT _FILE_NAME) FROM `__PROJECT_ID__.__DATASET_ID__.external_ftplog_files`
      WHERE NOT EXISTS (
-         SELECT 1 FROM `sbox-ravelar-001-20250926.logviewer.processed_files` pf
+         SELECT 1 FROM `__PROJECT_ID__.__DATASET_ID__.processed_files` pf
          WHERE pf.gcs_uri = _FILE_NAME
      )) AS pending_files,
     
     -- Error count
-    (SELECT COUNTIF(status != 'SUCCESS') FROM `sbox-ravelar-001-20250926.logviewer.processed_files`
+    (SELECT COUNTIF(status != 'SUCCESS') FROM `__PROJECT_ID__.__DATASET_ID__.processed_files`
      WHERE processed_timestamp >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 24 HOUR)) AS errors_24h,
     
     -- Last processing time
-    (SELECT MAX(processed_timestamp) FROM `sbox-ravelar-001-20250926.logviewer.processed_files`) AS last_processed,
+    (SELECT MAX(processed_timestamp) FROM `__PROJECT_ID__.__DATASET_ID__.processed_files`) AS last_processed,
     
     -- Overall status
     CASE
-        WHEN (SELECT COUNT(*) FROM `sbox-ravelar-001-20250926.logviewer.processed_files`
+        WHEN (SELECT COUNT(*) FROM `__PROJECT_ID__.__DATASET_ID__.processed_files`
               WHERE processed_timestamp >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 1 HOUR)) = 0
-             AND (SELECT COUNT(DISTINCT _FILE_NAME) FROM `sbox-ravelar-001-20250926.logviewer.external_ftplog_files`
+             AND (SELECT COUNT(DISTINCT _FILE_NAME) FROM `__PROJECT_ID__.__DATASET_ID__.external_ftplog_files`
                   WHERE NOT EXISTS (
-                      SELECT 1 FROM `sbox-ravelar-001-20250926.logviewer.processed_files` pf
+                      SELECT 1 FROM `__PROJECT_ID__.__DATASET_ID__.processed_files` pf
                       WHERE pf.gcs_uri = _FILE_NAME
                   )) > 0
         THEN '🔴 CRITICAL: Pipeline appears stuck'
-        WHEN (SELECT COUNTIF(status != 'SUCCESS') FROM `sbox-ravelar-001-20250926.logviewer.processed_files`
+        WHEN (SELECT COUNTIF(status != 'SUCCESS') FROM `__PROJECT_ID__.__DATASET_ID__.processed_files`
               WHERE processed_timestamp >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 24 HOUR)) > 
-             (SELECT COUNT(*) FROM `sbox-ravelar-001-20250926.logviewer.processed_files`
+             (SELECT COUNT(*) FROM `__PROJECT_ID__.__DATASET_ID__.processed_files`
               WHERE processed_timestamp >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 24 HOUR)) * 0.05
         THEN '🟡 WARNING: High error rate'
         ELSE '🟢 HEALTHY'

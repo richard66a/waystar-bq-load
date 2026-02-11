@@ -16,7 +16,7 @@
 -- =====================================================================
 -- STEP 1: Create Dataset
 -- =====================================================================
-CREATE SCHEMA IF NOT EXISTS `sbox-ravelar-001-20250926.logviewer`
+CREATE SCHEMA IF NOT EXISTS `__PROJECT_ID__.__DATASET_ID__`
 OPTIONS (
     description = 'FTP log data - GCP-native pipeline migrated from Snowflake',
     location = 'US',
@@ -30,7 +30,7 @@ OPTIONS (
 -- =====================================================================
 -- STEP 2: Create Base Table
 -- =====================================================================
-CREATE TABLE IF NOT EXISTS `sbox-ravelar-001-20250926.logviewer.base_ftplog`
+CREATE TABLE IF NOT EXISTS `__PROJECT_ID__.__DATASET_ID__.base_ftplog`
 (
     load_time_dt TIMESTAMP NOT NULL 
         OPTIONS(description = 'Timestamp when this record was loaded to BigQuery'),
@@ -79,7 +79,7 @@ OPTIONS (
 -- =====================================================================
 -- STEP 3: Create Archive Table
 -- =====================================================================
-CREATE TABLE IF NOT EXISTS `sbox-ravelar-001-20250926.logviewer.archive_ftplog`
+CREATE TABLE IF NOT EXISTS `__PROJECT_ID__.__DATASET_ID__.archive_ftplog`
 (
     raw_json STRING NOT NULL 
         OPTIONS(description = 'Complete raw JSON line from source file'),
@@ -101,7 +101,7 @@ OPTIONS (
 -- =====================================================================
 -- STEP 4: Create Processed Files Table
 -- =====================================================================
-CREATE TABLE IF NOT EXISTS `sbox-ravelar-001-20250926.logviewer.processed_files`
+CREATE TABLE IF NOT EXISTS `__PROJECT_ID__.__DATASET_ID__.processed_files`
 (
     gcs_uri STRING NOT NULL 
         OPTIONS(description = 'Full GCS URI of processed file'),
@@ -128,13 +128,13 @@ OPTIONS (
 );
 
 -- Ensure schema is updated if the table already exists
-ALTER TABLE `sbox-ravelar-001-20250926.logviewer.processed_files`
+ALTER TABLE `__PROJECT_ID__.__DATASET_ID__.processed_files`
 ADD COLUMN IF NOT EXISTS rows_expected INT64 OPTIONS(description = 'Number of non-empty rows discovered for this file');
 
-ALTER TABLE `sbox-ravelar-001-20250926.logviewer.processed_files`
+ALTER TABLE `__PROJECT_ID__.__DATASET_ID__.processed_files`
 ADD COLUMN IF NOT EXISTS parse_errors INT64 OPTIONS(description = 'Number of rows not loaded (rows_expected - rows_loaded)');
 
-ALTER TABLE `sbox-ravelar-001-20250926.logviewer.base_ftplog`
+ALTER TABLE `__PROJECT_ID__.__DATASET_ID__.base_ftplog`
 ADD COLUMN IF NOT EXISTS hash_fingerprint STRING OPTIONS(description = 'Deterministic SHA256 hex fingerprint for row deduplication');
 
 -- =====================================================================
@@ -143,7 +143,7 @@ ADD COLUMN IF NOT EXISTS hash_fingerprint STRING OPTIONS(description = 'Determin
 -- =====================================================================
 -- STEP 5: Create Monitoring Snapshot Table
 -- =====================================================================
-CREATE TABLE IF NOT EXISTS `sbox-ravelar-001-20250926.logviewer.pipeline_monitoring`
+CREATE TABLE IF NOT EXISTS `__PROJECT_ID__.__DATASET_ID__.pipeline_monitoring`
 (
     check_time TIMESTAMP NOT NULL
         OPTIONS(description = 'Snapshot timestamp'),
@@ -170,9 +170,9 @@ OPTIONS (
 -- STEP 6: Create External Table
 -- =====================================================================
 -- Drop if exists (external tables can't use IF NOT EXISTS with different URIs)
-DROP EXTERNAL TABLE IF EXISTS `sbox-ravelar-001-20250926.logviewer.external_ftplog_files`;
+DROP EXTERNAL TABLE IF EXISTS `__PROJECT_ID__.__DATASET_ID__.external_ftplog_files`;
 
-CREATE EXTERNAL TABLE `sbox-ravelar-001-20250926.logviewer.external_ftplog_files`
+CREATE EXTERNAL TABLE `__PROJECT_ID__.__DATASET_ID__.external_ftplog_files`
 (
     data STRING OPTIONS(description = 'Raw JSON line from NDJSON file')
 )
@@ -190,5 +190,5 @@ SELECT
     table_name,
     table_type,
     creation_time AS created_at
-FROM `sbox-ravelar-001-20250926.logviewer.INFORMATION_SCHEMA.TABLES`
+FROM `__PROJECT_ID__.__DATASET_ID__.INFORMATION_SCHEMA.TABLES`
 ORDER BY creation_time DESC;

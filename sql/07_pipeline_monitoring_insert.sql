@@ -4,7 +4,7 @@
 -- Intended for use in a scheduled query to populate pipeline_monitoring.
 -- =============================================================================
 
-INSERT INTO `sbox-ravelar-001-20250926.logviewer.pipeline_monitoring`
+INSERT INTO `__PROJECT_ID__.__DATASET_ID__.pipeline_monitoring`
 (
     check_time,
     files_processed_last_hour,
@@ -23,19 +23,19 @@ pending_files AS (
             '%Y%m%d-%H%M%S',
             REGEXP_EXTRACT(ext._FILE_NAME, r'-(\d{8}-\d{6})')
         ) AS estimated_file_time
-    FROM `sbox-ravelar-001-20250926.logviewer.external_ftplog_files` ext
+    FROM `__PROJECT_ID__.__DATASET_ID__.external_ftplog_files` ext
     WHERE NOT EXISTS (
-        SELECT 1 FROM `sbox-ravelar-001-20250926.logviewer.processed_files` pf
+        SELECT 1 FROM `__PROJECT_ID__.__DATASET_ID__.processed_files` pf
         WHERE pf.gcs_uri = ext._FILE_NAME
     )
 ),
 stats AS (
     SELECT
-        (SELECT COUNT(*) FROM `sbox-ravelar-001-20250926.logviewer.processed_files`
+        (SELECT COUNT(*) FROM `__PROJECT_ID__.__DATASET_ID__.processed_files`
          WHERE processed_timestamp >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 1 HOUR)) AS files_processed_last_hour,
         (SELECT COUNT(*) FROM pending_files) AS files_pending,
         (SELECT ROUND(SAFE_DIVIDE(COUNTIF(status != 'SUCCESS'), COUNT(*)) * 100, 2)
-         FROM `sbox-ravelar-001-20250926.logviewer.processed_files`
+         FROM `__PROJECT_ID__.__DATASET_ID__.processed_files`
          WHERE processed_timestamp >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 24 HOUR)) AS error_rate_pct,
         (SELECT MAX(TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), estimated_file_time, MINUTE))
          FROM pending_files

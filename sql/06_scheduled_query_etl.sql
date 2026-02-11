@@ -37,11 +37,11 @@ CREATE TEMP TABLE _new_files AS
 SELECT DISTINCT
     _FILE_NAME AS file_path,
     REGEXP_EXTRACT(_FILE_NAME, r'/([^/]+)\.json$') AS originating_filename
-FROM `sbox-ravelar-001-20250926.logviewer.external_ftplog_files`
+FROM `__PROJECT_ID__.__DATASET_ID__.external_ftplog_files`
 WHERE _FILE_NAME IS NOT NULL
   AND NOT EXISTS (
       SELECT 1 
-      FROM `sbox-ravelar-001-20250926.logviewer.processed_files` pf
+      FROM `__PROJECT_ID__.__DATASET_ID__.processed_files` pf
       WHERE pf.gcs_uri = _FILE_NAME
   );
 
@@ -57,7 +57,7 @@ SELECT
     nf.file_path,
     nf.originating_filename,
     COUNTIF(ext.data IS NOT NULL AND TRIM(ext.data) != '') AS rows_expected
-FROM `sbox-ravelar-001-20250926.logviewer.external_ftplog_files` ext
+FROM `__PROJECT_ID__.__DATASET_ID__.external_ftplog_files` ext
 INNER JOIN _new_files nf
     ON ext._FILE_NAME = nf.file_path
 GROUP BY nf.file_path, nf.originating_filename;
@@ -67,7 +67,7 @@ GROUP BY nf.file_path, nf.originating_filename;
 -- =============================================================================
 -- Insert parsed JSON data into the base table
 -- Uses SAFE_ functions to handle malformed data gracefully
-INSERT INTO `sbox-ravelar-001-20250926.logviewer.base_ftplog`
+INSERT INTO `__PROJECT_ID__.__DATASET_ID__.base_ftplog`
 (
     load_time_dt,
     source_file_dt,
@@ -153,7 +153,7 @@ SELECT
     
     -- NOTE: StatusCode intentionally NOT included per requirements
     
-FROM `sbox-ravelar-001-20250926.logviewer.external_ftplog_files` ext
+FROM `__PROJECT_ID__.__DATASET_ID__.external_ftplog_files` ext
 INNER JOIN _new_files nf 
     ON ext._FILE_NAME = nf.file_path
 WHERE 
@@ -167,7 +167,7 @@ WHERE
 -- STEP 3: Archive raw JSON for compliance and recovery
 -- =============================================================================
 -- Store the raw JSON lines without any transformation
-INSERT INTO `sbox-ravelar-001-20250926.logviewer.archive_ftplog`
+INSERT INTO `__PROJECT_ID__.__DATASET_ID__.archive_ftplog`
 (
     raw_json,
     archived_timestamp,
@@ -181,7 +181,7 @@ SELECT
     CURRENT_TIMESTAMP() AS process_dt,
     nf.originating_filename,
     ext._FILE_NAME AS gcs_uri
-FROM `sbox-ravelar-001-20250926.logviewer.external_ftplog_files` ext
+FROM `__PROJECT_ID__.__DATASET_ID__.external_ftplog_files` ext
 INNER JOIN _new_files nf 
     ON ext._FILE_NAME = nf.file_path
 WHERE 
@@ -191,7 +191,7 @@ WHERE
 -- =============================================================================
 -- STEP 4: Mark files as processed (idempotent)
 -- =============================================================================
-MERGE `sbox-ravelar-001-20250926.logviewer.processed_files` AS target
+MERGE `__PROJECT_ID__.__DATASET_ID__.processed_files` AS target
 USING (
     SELECT
         fl.file_path AS gcs_uri,
@@ -220,7 +220,7 @@ USING (
             fs.rows_expected,
             (
                 SELECT COUNT(*)
-                FROM `sbox-ravelar-001-20250926.logviewer.base_ftplog` b
+                FROM `__PROJECT_ID__.__DATASET_ID__.base_ftplog` b
                 WHERE b.gcs_uri = fs.file_path
             ) AS rows_loaded
         FROM _file_stats fs
@@ -255,7 +255,7 @@ USING (
             JSON_VALUE(ext.data, '$.UserName') AS user_name,
             JSON_VALUE(ext.data, '$.ServerResponse') AS server_response,
             JSON_VALUE(ext.data, '$.RawData') AS raw_data
-        FROM `sbox-ravelar-001-20250926.logviewer.external_ftplog_files` ext
+        FROM `__PROJECT_ID__.__DATASET_ID__.external_ftplog_files` ext
         INNER JOIN _new_files nf
             ON ext._FILE_NAME = nf.file_path
         WHERE
@@ -283,7 +283,7 @@ USING (
         c.server_response,
         c.raw_data
     FROM candidate c
-    LEFT JOIN `sbox-ravelar-001-20250926.logviewer.base_ftplog` b
+    LEFT JOIN `__PROJECT_ID__.__DATASET_ID__.base_ftplog` b
         ON b.hash_fingerprint = c.hash_fingerprint
     WHERE b.hash_fingerprint IS NULL;
     'ETL Complete' AS status,
@@ -291,6 +291,6 @@ USING (
     (SELECT COUNT(*) FROM _new_files) AS files_processed,
     (
         SELECT COUNT(*) 
-        FROM `sbox-ravelar-001-20250926.logviewer.base_ftplog`
+        FROM `__PROJECT_ID__.__DATASET_ID__.base_ftplog`
         WHERE load_time_dt >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 1 HOUR)
     ) AS rows_loaded_last_hour;

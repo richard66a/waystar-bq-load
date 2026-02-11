@@ -12,7 +12,7 @@ Usage:
     python test_pipeline.py --test test_file_generation
 
     # Use custom configuration
-    python test_pipeline.py --project sbox-ravelar-001-20250926 --bucket my-bucket
+    python test_pipeline.py --project $PROJECT_ID --bucket $GCS_BUCKET
 """
 
 import argparse
@@ -27,10 +27,10 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional, List, Dict, Tuple
 import hashlib
 
-# Test configuration
-DEFAULT_PROJECT = "sbox-ravelar-001-20250926"
-DEFAULT_BUCKET = "sbox-ravelar-001-20250926-ftplog"
-DEFAULT_DATASET = "logviewer"
+# Test configuration (use environment variables, no hardcoded sandbox values)
+DEFAULT_PROJECT = os.environ.get("PROJECT_ID", "your-gcp-project-id")
+DEFAULT_BUCKET = os.environ.get("GCS_BUCKET", f"{DEFAULT_PROJECT}-ftplog")
+DEFAULT_DATASET = os.environ.get("DATASET_ID", "logviewer")
 
 
 class Colors:

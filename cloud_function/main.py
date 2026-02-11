@@ -423,7 +423,7 @@ def test_locally(bucket: str, file_name: str):
     Test the function locally without Cloud Functions framework.
     
     Usage:
-        python main.py --bucket sbox-ravelar-001-20250926-ftplog --file logs/test-file.json
+        python main.py --bucket ${GCS_BUCKET} --file logs/test-file.json
     """
     from unittest.mock import MagicMock
     

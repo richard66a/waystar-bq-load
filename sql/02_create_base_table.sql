@@ -15,7 +15,7 @@
 --   bq query --use_legacy_sql=false < 02_create_base_table.sql
 -- =============================================================================
 
-CREATE TABLE IF NOT EXISTS `sbox-ravelar-001-20250926.logviewer.base_ftplog`
+CREATE TABLE IF NOT EXISTS `__PROJECT_ID__.__DATASET_ID__.base_ftplog`
 (
     -- =========================================================================
     -- Metadata columns (populated during ETL)

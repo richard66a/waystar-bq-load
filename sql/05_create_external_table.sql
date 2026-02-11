@@ -16,11 +16,11 @@
 -- =============================================================================
 
 -- Drop existing external table if it exists (external tables need recreation for URI changes)
-DROP EXTERNAL TABLE IF EXISTS `sbox-ravelar-001-20250926.logviewer.external_ftplog_files`;
+DROP EXTERNAL TABLE IF EXISTS `__PROJECT_ID__.__DATASET_ID__.external_ftplog_files`;
 
 -- Create external table pointing to GCS
 -- The 'data' column will contain the entire JSON line as a string
-CREATE EXTERNAL TABLE `sbox-ravelar-001-20250926.logviewer.external_ftplog_files`
+CREATE EXTERNAL TABLE `__PROJECT_ID__.__DATASET_ID__.external_ftplog_files`
 (
     -- Each line from the NDJSON file is read as a single string
     data STRING OPTIONS(description = 'Raw JSON line from NDJSON file')
@@ -41,5 +41,5 @@ SELECT
     table_name,
     table_type,
     creation_time
-FROM `sbox-ravelar-001-20250926.logviewer.INFORMATION_SCHEMA.TABLES`
+FROM `__PROJECT_ID__.__DATASET_ID__.INFORMATION_SCHEMA.TABLES`
 WHERE table_name = 'external_ftplog_files';

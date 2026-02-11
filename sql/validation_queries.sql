@@ -26,7 +26,7 @@ SELECT
     SUM(rows_loaded) AS total_rows_loaded,
     SUM(parse_errors) AS total_parse_errors,
     AVG(rows_loaded) AS avg_rows_per_file
-FROM `sbox-ravelar-001-20250926.logviewer.processed_files`
+FROM `__PROJECT_ID__.__DATASET_ID__.processed_files`
 WHERE processed_timestamp >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 24 HOUR);
 
 
@@ -37,10 +37,10 @@ WHERE processed_timestamp >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 24 HOUR
 SELECT 
     'Unprocessed Files' AS report,
     COUNT(DISTINCT _FILE_NAME) AS pending_files
-FROM `sbox-ravelar-001-20250926.logviewer.external_ftplog_files`
+FROM `__PROJECT_ID__.__DATASET_ID__.external_ftplog_files`
 WHERE NOT EXISTS (
     SELECT 1 
-    FROM `sbox-ravelar-001-20250926.logviewer.processed_files` pf
+    FROM `__PROJECT_ID__.__DATASET_ID__.processed_files` pf
     WHERE pf.gcs_uri = _FILE_NAME
 );
 
@@ -57,7 +57,7 @@ SELECT
     parse_errors,
     status,
     TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), processed_timestamp, MINUTE) AS minutes_ago
-FROM `sbox-ravelar-001-20250926.logviewer.processed_files`
+FROM `__PROJECT_ID__.__DATASET_ID__.processed_files`
 ORDER BY processed_timestamp DESC
 LIMIT 10;
 
@@ -76,7 +76,7 @@ SELECT
     parse_errors,
     status,
     error_message
-FROM `sbox-ravelar-001-20250926.logviewer.processed_files`
+FROM `__PROJECT_ID__.__DATASET_ID__.processed_files`
 WHERE status != 'SUCCESS'
    OR parse_errors > 0
 ORDER BY processed_timestamp DESC
@@ -92,15 +92,15 @@ LIMIT 50;
 -- Compares counts across tables for a specific file
 -- Replace the gcs_uri with your test file
 -- -----------------------------------------------------------------------------
-DECLARE test_file STRING DEFAULT 'gs://sbox-ravelar-001-20250926-ftplog/logs/FTP-SERVER-01-20260128-103000001-test-sample-001.json';
+DECLARE test_file STRING DEFAULT 'gs://__PROJECT_ID__-ftplog/logs/FTP-SERVER-01-20260128-103000001-test-sample-001.json';
 
 SELECT 
     'Row Count Validation' AS check_name,
-    (SELECT rows_expected FROM `sbox-ravelar-001-20250926.logviewer.processed_files` WHERE gcs_uri = test_file) AS expected_rows,
-    (SELECT rows_loaded FROM `sbox-ravelar-001-20250926.logviewer.processed_files` WHERE gcs_uri = test_file) AS tracked_rows,
-    (SELECT parse_errors FROM `sbox-ravelar-001-20250926.logviewer.processed_files` WHERE gcs_uri = test_file) AS parse_errors,
-    (SELECT COUNT(*) FROM `sbox-ravelar-001-20250926.logviewer.base_ftplog` WHERE gcs_uri = test_file) AS base_table_rows,
-    (SELECT COUNT(*) FROM `sbox-ravelar-001-20250926.logviewer.archive_ftplog` WHERE gcs_uri = test_file) AS archive_rows;
+    (SELECT rows_expected FROM `__PROJECT_ID__.__DATASET_ID__.processed_files` WHERE gcs_uri = test_file) AS expected_rows,
+    (SELECT rows_loaded FROM `__PROJECT_ID__.__DATASET_ID__.processed_files` WHERE gcs_uri = test_file) AS tracked_rows,
+    (SELECT parse_errors FROM `__PROJECT_ID__.__DATASET_ID__.processed_files` WHERE gcs_uri = test_file) AS parse_errors,
+    (SELECT COUNT(*) FROM `__PROJECT_ID__.__DATASET_ID__.base_ftplog` WHERE gcs_uri = test_file) AS base_table_rows,
+    (SELECT COUNT(*) FROM `__PROJECT_ID__.__DATASET_ID__.archive_ftplog` WHERE gcs_uri = test_file) AS archive_rows;
 
 
 -- -----------------------------------------------------------------------------
@@ -115,7 +115,7 @@ SELECT
     COUNTIF(event_dt IS NULL) AS null_event_dt,
     COUNTIF(source IS NULL) AS null_source,
     COUNTIF(action IS NULL) AS null_action
-FROM `sbox-ravelar-001-20250926.logviewer.base_ftplog`
+FROM `__PROJECT_ID__.__DATASET_ID__.base_ftplog`
 WHERE load_time_dt >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 24 HOUR);
 
 
@@ -129,7 +129,7 @@ SELECT
     COUNTIF(bytes IS NULL AND raw_data LIKE '%Bytes%') AS possible_bytes_parse_errors,
     COUNTIF(cust_id IS NULL AND raw_data LIKE '%CustId%') AS possible_custid_parse_errors,
     COUNTIF(hash_code IS NULL AND raw_data LIKE '%HashCode%') AS possible_hash_parse_errors
-FROM `sbox-ravelar-001-20250926.logviewer.base_ftplog`
+FROM `__PROJECT_ID__.__DATASET_ID__.base_ftplog`
 WHERE load_time_dt >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 24 HOUR);
 
 
@@ -145,7 +145,7 @@ SELECT
     'Duplicate File Check' AS check_name,
     gcs_uri,
     COUNT(*) AS times_processed
-FROM `sbox-ravelar-001-20250926.logviewer.processed_files`
+FROM `__PROJECT_ID__.__DATASET_ID__.processed_files`
 GROUP BY gcs_uri
 HAVING COUNT(*) > 1
 ORDER BY times_processed DESC
@@ -160,7 +160,7 @@ SELECT
     'Duplicate Row Check (by hash)' AS check_name,
         COALESCE(hash_fingerprint, CAST(hash_code AS STRING)) AS dedupe_key,
         COUNT(*) AS occurrences
-FROM `sbox-ravelar-001-20250926.logviewer.base_ftplog`
+FROM `__PROJECT_ID__.__DATASET_ID__.base_ftplog`
 WHERE load_time_dt >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 24 HOUR)
     AND (hash_fingerprint IS NOT NULL OR hash_code IS NOT NULL)
 GROUP BY dedupe_key
@@ -184,7 +184,7 @@ SELECT
     AVG(rows_loaded) AS avg_rows_per_file,
     MIN(rows_loaded) AS min_rows,
     MAX(rows_loaded) AS max_rows
-FROM `sbox-ravelar-001-20250926.logviewer.processed_files`
+FROM `__PROJECT_ID__.__DATASET_ID__.processed_files`
 GROUP BY DATE(processed_timestamp)
 ORDER BY processing_date DESC
 LIMIT 30;
@@ -198,7 +198,7 @@ SELECT
     EXTRACT(HOUR FROM processed_timestamp) AS hour_of_day,
     COUNT(*) AS files_processed,
     SUM(rows_loaded) AS total_rows
-FROM `sbox-ravelar-001-20250926.logviewer.processed_files`
+FROM `__PROJECT_ID__.__DATASET_ID__.processed_files`
 WHERE processed_timestamp >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 7 DAY)
 GROUP BY hour_of_day
 ORDER BY hour_of_day;
@@ -214,7 +214,7 @@ SELECT
     COUNT(DISTINCT DATE(event_dt)) AS active_days,
     MIN(event_dt) AS first_event,
     MAX(event_dt) AS last_event
-FROM `sbox-ravelar-001-20250926.logviewer.base_ftplog`
+FROM `__PROJECT_ID__.__DATASET_ID__.base_ftplog`
 WHERE event_dt >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 7 DAY)
 GROUP BY source
 ORDER BY event_count DESC;
@@ -235,7 +235,7 @@ SELECT
     COUNTIF(cust_id = 0 AND partner_name IS NULL) AS unknown_events,
     COUNT(DISTINCT CASE WHEN cust_id > 0 THEN cust_id END) AS unique_customers,
     COUNT(DISTINCT partner_name) AS unique_partners
-FROM `sbox-ravelar-001-20250926.logviewer.base_ftplog`
+FROM `__PROJECT_ID__.__DATASET_ID__.base_ftplog`
 WHERE event_dt >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 7 DAY);
 
 
@@ -247,7 +247,7 @@ SELECT
     action,
     COUNT(*) AS event_count,
     ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER(), 2) AS percentage
-FROM `sbox-ravelar-001-20250926.logviewer.base_ftplog`
+FROM `__PROJECT_ID__.__DATASET_ID__.base_ftplog`
 WHERE event_dt >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 7 DAY)
 GROUP BY action
 ORDER BY event_count DESC;
@@ -267,7 +267,7 @@ SELECT
     filename,
     bytes,
     server_response
-FROM `sbox-ravelar-001-20250926.logviewer.base_ftplog`
+FROM `__PROJECT_ID__.__DATASET_ID__.base_ftplog`
 ORDER BY event_dt DESC
 LIMIT 20;
 
@@ -282,10 +282,10 @@ LIMIT 20;
 -- -----------------------------------------------------------------------------
 SELECT
     'Archive vs Base Comparison' AS check_name,
-    (SELECT COUNT(DISTINCT gcs_uri) FROM `sbox-ravelar-001-20250926.logviewer.base_ftplog`) AS base_files,
-    (SELECT COUNT(DISTINCT gcs_uri) FROM `sbox-ravelar-001-20250926.logviewer.archive_ftplog`) AS archive_files,
-    (SELECT COUNT(*) FROM `sbox-ravelar-001-20250926.logviewer.base_ftplog`) AS base_rows,
-    (SELECT COUNT(*) FROM `sbox-ravelar-001-20250926.logviewer.archive_ftplog`) AS archive_rows;
+    (SELECT COUNT(DISTINCT gcs_uri) FROM `__PROJECT_ID__.__DATASET_ID__.base_ftplog`) AS base_files,
+    (SELECT COUNT(DISTINCT gcs_uri) FROM `__PROJECT_ID__.__DATASET_ID__.archive_ftplog`) AS archive_files,
+    (SELECT COUNT(*) FROM `__PROJECT_ID__.__DATASET_ID__.base_ftplog`) AS base_rows,
+    (SELECT COUNT(*) FROM `__PROJECT_ID__.__DATASET_ID__.archive_ftplog`) AS archive_rows;
 
 
 -- -----------------------------------------------------------------------------
@@ -296,6 +296,6 @@ SELECT
     originating_filename,
     SAFE.PARSE_JSON(raw_json) IS NOT NULL AS is_valid_json,
     LEFT(raw_json, 100) AS json_preview
-FROM `sbox-ravelar-001-20250926.logviewer.archive_ftplog`
+FROM `__PROJECT_ID__.__DATASET_ID__.archive_ftplog`
 ORDER BY archived_timestamp DESC
 LIMIT 10;

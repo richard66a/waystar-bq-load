@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PROJECT_ID="${PROJECT_ID:-sbox-ravelar-001-20250926}"
+PROJECT_ID="${PROJECT_ID:?PROJECT_ID environment variable is required}"
 DATASET="${DATASET:-logviewer}"
-BUCKET="${BUCKET:-sbox-ravelar-001-20250926-ftplog}"
+BUCKET="${BUCKET:-${PROJECT_ID}-ftplog}"
 PATH_PREFIX="${PATH_PREFIX:-logs}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -27,11 +27,17 @@ echo "Uploading sample file to ${GCS_URI}"
 gsutil cp "${SAMPLE_FILE}" "${GCS_URI}"
 
 echo "Creating dataset/tables/external table using ${GCS_WILDCARD}"
-sed "s|__GCS_URI__|${GCS_WILDCARD}|" "${SQL_DIR}/00_setup_all.sql" | \
+sed -e "s|__PROJECT_ID__|${PROJECT_ID}|g" \
+    -e "s|__DATASET_ID__|${DATASET}|g" \
+    -e "s|__GCS_URI__|${GCS_WILDCARD}|g" \
+    "${SQL_DIR}/00_setup_all.sql" | \
   bq query --use_legacy_sql=false --project_id="${PROJECT_ID}"
 
 echo "Creating ETL stored procedure"
-bq query --use_legacy_sql=false --project_id="${PROJECT_ID}" < "${SQL_DIR}/06_scheduled_query_proc.sql"
+sed -e "s|__PROJECT_ID__|${PROJECT_ID}|g" \
+    -e "s|__DATASET_ID__|${DATASET}|g" \
+    "${SQL_DIR}/06_scheduled_query_proc.sql" | \
+  bq query --use_legacy_sql=false --project_id="${PROJECT_ID}"
 
 echo "External table discovery check"
 bq query --use_legacy_sql=false --project_id="${PROJECT_ID}" \

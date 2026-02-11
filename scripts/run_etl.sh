@@ -53,7 +53,9 @@ log_info "Running ETL query..."
 START_TIME=$(date +%s)
 
 bq query --use_legacy_sql=false --project_id="${PROJECT_ID}" \
-    < "${SCRIPT_DIR}/../sql/06_scheduled_query_etl.sql"
+    < <(sed -e "s|__PROJECT_ID__|${PROJECT_ID}|g" \
+            -e "s|__DATASET_ID__|${DATASET_ID}|g" \
+            "${SCRIPT_DIR}/../sql/06_scheduled_query_etl.sql")
 
 END_TIME=$(date +%s)
 DURATION=$((END_TIME - START_TIME))

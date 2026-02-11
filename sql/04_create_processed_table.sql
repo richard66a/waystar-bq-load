@@ -13,7 +13,7 @@
 --   bq query --use_legacy_sql=false < 04_create_processed_table.sql
 -- =============================================================================
 
-CREATE TABLE IF NOT EXISTS `sbox-ravelar-001-20250926.logviewer.processed_files`
+CREATE TABLE IF NOT EXISTS `__PROJECT_ID__.__DATASET_ID__.processed_files`
 (
     -- Full GCS URI (unique identifier for each file)
     gcs_uri STRING NOT NULL 
@@ -63,10 +63,10 @@ OPTIONS (
 );
 
 -- Ensure schema is updated if the table already exists
-ALTER TABLE `sbox-ravelar-001-20250926.logviewer.processed_files`
+ALTER TABLE `__PROJECT_ID__.__DATASET_ID__.processed_files`
 ADD COLUMN IF NOT EXISTS rows_expected INT64 OPTIONS(description = 'Number of non-empty rows discovered for this file');
 
-ALTER TABLE `sbox-ravelar-001-20250926.logviewer.processed_files`
+ALTER TABLE `__PROJECT_ID__.__DATASET_ID__.processed_files`
 ADD COLUMN IF NOT EXISTS parse_errors INT64 OPTIONS(description = 'Number of rows not loaded (rows_expected - rows_loaded)');
 
 -- Create a unique constraint simulation using a view

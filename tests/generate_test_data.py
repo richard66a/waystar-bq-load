@@ -14,7 +14,7 @@ Usage:
     python generate_test_data.py --output-dir ./test_files --num-files 3 --rows-per-file 100
     
     # Upload to GCS
-    gsutil cp ./test_files/*.json gs://sbox-ravelar-001-20250926-ftplog/logs/
+    gsutil cp ./test_files/*.json gs://${GCS_BUCKET}/logs/
 """
 
 import argparse
@@ -328,7 +328,7 @@ Examples:
   python generate_test_data.py --output-dir ./test_files --num-files 5 --start-date "2026-01-28T10:00:00"
   
 After generating, upload to GCS:
-  gsutil cp ./test_files/*.json gs://sbox-ravelar-001-20250926-ftplog/logs/
+  gsutil cp ./test_files/*.json gs://${GCS_BUCKET}/logs/
         """
     )
     
@@ -404,7 +404,7 @@ After generating, upload to GCS:
     print(f"  1. Review files: ls -la {args.output_dir}")
     print(f"  2. View sample: head -5 {generated_files[0] if generated_files else '<file>'}")
     print(f"  3. Upload to GCS:")
-    print(f"     gsutil cp {args.output_dir}/*.json gs://sbox-ravelar-001-20250926-ftplog/logs/")
+    print(f"     gsutil cp {args.output_dir}/*.json gs://$GCS_BUCKET/logs/")
     print()
 
 

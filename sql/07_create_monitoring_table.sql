@@ -7,7 +7,7 @@
 --   bq query --use_legacy_sql=false < 07_create_monitoring_table.sql
 -- =============================================================================
 
-CREATE TABLE IF NOT EXISTS `sbox-ravelar-001-20250926.logviewer.pipeline_monitoring`
+CREATE TABLE IF NOT EXISTS `__PROJECT_ID__.__DATASET_ID__.pipeline_monitoring`
 (
     check_time TIMESTAMP NOT NULL
         OPTIONS(description = 'Snapshot timestamp'),

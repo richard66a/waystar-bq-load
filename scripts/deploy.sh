@@ -129,7 +129,10 @@ log_info "Creating dataset and tables..."
 # Substitute the external table URI placeholder with the configured bucket URI
 TMP_SQL="/tmp/00_setup_all.$(date +%s).sql"
 GCS_URI_REPLACEMENT="gs://${GCS_BUCKET}/${GCS_LOGS_PREFIX}/*.json"
-sed "s|__GCS_URI__|${GCS_URI_REPLACEMENT}|g" 00_setup_all.sql > "${TMP_SQL}"
+sed -e "s|__PROJECT_ID__|${PROJECT_ID}|g" \
+    -e "s|__DATASET_ID__|${DATASET_ID}|g" \
+    -e "s|__GCS_URI__|${GCS_URI_REPLACEMENT}|g" \
+    00_setup_all.sql > "${TMP_SQL}"
 bq query --use_legacy_sql=false --project_id="${PROJECT_ID}" < "${TMP_SQL}"
 rm -f "${TMP_SQL}"
 
@@ -163,6 +166,8 @@ else
 import json
 from pathlib import Path
 sql = Path("${QUERY_FILE}").read_text()
+sql = sql.replace("__PROJECT_ID__", "${PROJECT_ID}")
+sql = sql.replace("__DATASET_ID__", "${DATASET_ID}")
 print(json.dumps({"query": sql}))
 PY
 )

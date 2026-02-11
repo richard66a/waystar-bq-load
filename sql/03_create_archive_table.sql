@@ -13,7 +13,7 @@
 --   bq query --use_legacy_sql=false < 03_create_archive_table.sql
 -- =============================================================================
 
-CREATE TABLE IF NOT EXISTS `sbox-ravelar-001-20250926.logviewer.archive_ftplog`
+CREATE TABLE IF NOT EXISTS `__PROJECT_ID__.__DATASET_ID__.archive_ftplog`
 (
     -- Complete raw JSON line from source file (no parsing applied)
     raw_json STRING NOT NULL 
