@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # =============================================================================
 # FTP Log Pipeline - Deploy Monitoring Alerts
 # =============================================================================
@@ -7,11 +7,15 @@
 # a log-based metric + alert policy in Cloud Monitoring.
 # =============================================================================
 
-set -e
+set -euo pipefail
+IFS=$'\n\t'
 
 # Load configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../config/settings.sh"
+
+require_cmd gcloud
+require_cmd bq
 
 set_project
 
@@ -51,7 +55,7 @@ gcloud functions deploy "${MONITORING_ALERT_FUNCTION_NAME}" \
   --service-account="${SERVICE_ACCOUNT_EMAIL}" \
   --memory="${CLOUD_FUNCTION_MEMORY}" \
   --timeout="${CLOUD_FUNCTION_TIMEOUT}" \
-  --set-env-vars="PROJECT_ID=${PROJECT_ID}"
+  --set-env-vars="PROJECT_ID=${PROJECT_ID},DATASET_ID=${DATASET_ID}"
 
 FUNCTION_URL=$(gcloud functions describe "${MONITORING_ALERT_FUNCTION_NAME}" \
   --gen2 \

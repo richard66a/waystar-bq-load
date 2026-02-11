@@ -67,16 +67,16 @@ if [[ -n "$BUCKET" ]]; then
     echo "Running BigQuery validation queries (project=$PROJECT dataset=$DATASET)"
 
     echo "Processed files:" 
-    bq query --nouse_legacy_sql --format=prettyjson "SELECT gcs_uri, originating_filename, processed_at FROM \\`$PROJECT.$DATASET.processed_files\\` ORDER BY processed_at DESC LIMIT 10"
+      bq query --use_legacy_sql=false --format=prettyjson "SELECT gcs_uri, originating_filename, processed_timestamp, rows_loaded, rows_expected, parse_errors, status FROM \`$PROJECT.$DATASET.processed_files\` ORDER BY processed_timestamp DESC LIMIT 10"
 
     echo "Parsed rows count:"
-    bq query --nouse_legacy_sql --format=prettyjson "SELECT COUNT(*) AS parsed_rows FROM \\`$PROJECT.$DATASET.base_ftplog\\`"
+      bq query --use_legacy_sql=false --format=prettyjson "SELECT COUNT(*) AS parsed_rows FROM \`$PROJECT.$DATASET.base_ftplog\`"
 
     echo "Sample rows from base_ftplog:"
-    bq query --nouse_legacy_sql --format=prettyjson "SELECT cust_id, event_dt, action, filename, source FROM \\`$PROJECT.$DATASET.base_ftplog\\` ORDER BY event_dt DESC LIMIT 10"
+      bq query --use_legacy_sql=false --format=prettyjson "SELECT cust_id, event_dt, action, filename, source FROM \`$PROJECT.$DATASET.base_ftplog\` ORDER BY event_dt DESC LIMIT 10"
 
     echo "Sample archive entries:"
-    bq query --nouse_legacy_sql --format=prettyjson "SELECT originating_filename, raw_json FROM \\`$PROJECT.$DATASET.archive_ftplog\\` LIMIT 5"
+      bq query --use_legacy_sql=false --format=prettyjson "SELECT originating_filename, raw_json FROM \`$PROJECT.$DATASET.archive_ftplog\` LIMIT 5"
   else
     echo "Skipping BigQuery validation queries because --project/--dataset not provided."
   fi

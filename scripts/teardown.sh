@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # =============================================================================
 # FTP Log Pipeline - Cleanup/Teardown Script
 # =============================================================================
@@ -10,11 +10,16 @@
 #   ./teardown.sh [--confirm]
 # =============================================================================
 
-set -e
+set -euo pipefail
+IFS=$'\n\t'
 
 # Load configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../config/settings.sh"
+
+require_cmd gcloud
+require_cmd bq
+require_cmd gsutil
 
 echo "=============================================================="
 echo "FTP Log Pipeline - Teardown Script"
@@ -30,7 +35,7 @@ echo "  - Scheduled queries"
 echo ""
 
 # Check for confirmation flag
-if [ "$1" != "--confirm" ]; then
+if [ "${1:-}" != "--confirm" ]; then
     echo "To proceed, run: $0 --confirm"
     echo ""
     exit 1

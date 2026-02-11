@@ -2,6 +2,19 @@
 
 A production-ready, GCP-native data pipeline for processing FTP log events from GCS to BigQuery.
 
+## Canonical Documentation
+
+For the consolidated docs set, see:
+
+- [docs/README.md](docs/README.md)
+- [docs/runbook_ops_validation.md](docs/runbook_ops_validation.md)
+- [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md)
+- [docs/CHANGELOG.md](docs/CHANGELOG.md)
+
+Configuration template:
+
+- [config/example.settings.sh](config/example.settings.sh)
+
 ## 📋 Table of Contents
 
 - [Overview](#overview)

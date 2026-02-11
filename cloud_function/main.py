@@ -20,10 +20,13 @@ Deployment:
         --source=. \
         --entry-point=process_ftplog \
         --trigger-event-filters="type=google.cloud.storage.object.v1.finalized" \
-        --trigger-event-filters="bucket=sbox-ravelar-001-20250926-ftplog" \
-        --service-account=sa-logviewer@sbox-ravelar-001-20250926.iam.gserviceaccount.com \
+        --trigger-event-filters="bucket=<YOUR_BUCKET>" \
+        --service-account=<YOUR_SERVICE_ACCOUNT> \
         --memory=512MB \
         --timeout=300s
+
+Environment variables:
+    PROJECT_ID, DATASET_ID, GCS_LOGS_PREFIX
 """
 
 import functions_framework
@@ -32,6 +35,8 @@ from google.cloud import storage
 import json
 import re
 import logging
+import os
+import hashlib
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, Dict, Any, List, Tuple
@@ -44,11 +49,12 @@ logger = logging.getLogger(__name__)
 # Configuration
 # =============================================================================
 
-PROJECT_ID = "sbox-ravelar-001-20250926"
-DATASET_ID = "logviewer"
-BASE_TABLE = "base_ftplog"
-ARCHIVE_TABLE = "archive_ftplog"
-PROCESSED_TABLE = "processed_files"
+PROJECT_ID = os.getenv("PROJECT_ID", "your-gcp-project-id")
+DATASET_ID = os.getenv("DATASET_ID", "logviewer")
+BASE_TABLE = os.getenv("BASE_TABLE", "base_ftplog")
+ARCHIVE_TABLE = os.getenv("ARCHIVE_TABLE", "archive_ftplog")
+PROCESSED_TABLE = os.getenv("PROCESSED_TABLE", "processed_files")
+GCS_LOGS_PREFIX = os.getenv("GCS_LOGS_PREFIX", "logs")
 
 # Fully qualified table names
 FQ_BASE_TABLE = f"{PROJECT_ID}.{DATASET_ID}.{BASE_TABLE}"
@@ -59,7 +65,7 @@ FQ_PROCESSED_TABLE = f"{PROJECT_ID}.{DATASET_ID}.{PROCESSED_TABLE}"
 SCHEDULED_SQL_PATH = Path(__file__).parent / "etl_sql.sql"
 
 # File pattern to process (only files in logs/ prefix with .json extension)
-FILE_PATTERN = r"^logs/.*\.json$"
+FILE_PATTERN = rf"^{re.escape(GCS_LOGS_PREFIX)}/.*\.json$"
 
 
 # =============================================================================
@@ -105,6 +111,18 @@ def safe_int(value: Any) -> Optional[int]:
         return None
 
 
+def compute_hash_fingerprint(data: Dict[str, Any]) -> str:
+    """Compute deterministic SHA256 hex fingerprint from canonical fields."""
+    canonical = "|".join([
+        str(data.get("EventDt") or ""),
+        str(data.get("Source") or ""),
+        str(data.get("Filename") or ""),
+        str(data.get("Bytes") or ""),
+        str(data.get("UserName") or ""),
+    ])
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
 def parse_json_line(line: str, gcs_uri: str, originating_filename: str) -> Tuple[Optional[Dict], Dict]:
     """
     Parse a single JSON line into base table row and archive row.
@@ -144,6 +162,7 @@ def parse_json_line(line: str, gcs_uri: str, originating_filename: str) -> Tuple
         "event_dt": event_dt.isoformat() if event_dt else None,
         "filename": data.get("Filename"),
         "hash_code": safe_int(data.get("HashCode")),
+        "hash_fingerprint": compute_hash_fingerprint(data),
         "ip_address": data.get("IpAddress"),
         "partner_name": data.get("PartnerName"),
         "session_id": data.get("SessionId"),
@@ -202,12 +221,29 @@ def load_to_bigquery(
     duration_seconds = (end_time - start_time).total_seconds()
     
     # Record in processed_files
+    rows_expected = len(archive_rows)
+    rows_loaded = len(base_rows)
+    parse_errors = max(rows_expected - rows_loaded, 0)
+    status = "SUCCESS" if parse_errors == 0 and rows_loaded > 0 else "PARTIAL"
+    error_message = None
+    if rows_expected == 0:
+        status = "FAILED"
+        error_message = "No non-empty rows found in file"
+    elif rows_loaded == 0:
+        status = "FAILED"
+        error_message = "No rows loaded from file"
+    elif parse_errors > 0:
+        error_message = f"Parsed {rows_loaded} of {rows_expected} rows"
+
     processed_row = [{
         "gcs_uri": gcs_uri,
         "originating_filename": originating_filename,
         "processed_timestamp": end_time.isoformat(),
-        "rows_loaded": len(base_rows),
-        "status": "SUCCESS" if len(base_rows) == len(archive_rows) else "PARTIAL",
+        "rows_loaded": rows_loaded,
+        "rows_expected": rows_expected,
+        "parse_errors": parse_errors,
+        "status": status,
+        "error_message": error_message,
         "processing_duration_seconds": duration_seconds,
     }]
     
@@ -216,7 +252,7 @@ def load_to_bigquery(
         logger.error(f"Processed files insert errors: {errors}")
         raise Exception(f"Failed to record processed file: {errors}")
     
-    return "SUCCESS" if len(base_rows) == len(archive_rows) else "PARTIAL"
+    return status
 
 
 # =============================================================================

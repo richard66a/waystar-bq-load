@@ -1,0 +1,27 @@
+# OS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.venv/
+
+# Node / tooling
+node_modules/
+
+# Local test output
+/test_files/
+/tmp/
+
+# Environment files
+.env
+.env.*
+
+# Local overrides
+config/settings.local.sh
+
+# Logs
+*.log

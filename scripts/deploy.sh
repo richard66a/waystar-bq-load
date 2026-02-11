@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # =============================================================================
 # FTP Log Pipeline - Full Deployment Script
 # =============================================================================
@@ -15,11 +15,17 @@
 #   ./deploy.sh
 # =============================================================================
 
-set -e  # Exit on error
+set -euo pipefail
+IFS=$'\n\t'
 
 # Load configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../config/settings.sh"
+
+require_cmd gcloud
+require_cmd bq
+require_cmd gsutil
+require_cmd python3
 
 echo "=============================================================="
 echo "FTP Log Pipeline - Deployment Script"
@@ -136,6 +142,8 @@ echo ""
 log_info "Step 4: Creating scheduled query..."
 
 # Check if scheduled query already exists
+: "${USE_CALL_PROCEDURE:=false}"
+
 EXISTING_QUERY=$(bq ls --transfer_config --transfer_location="${BQ_LOCATION}" \
     --project_id="${PROJECT_ID}" \
     --format=json 2>/dev/null | \

@@ -29,6 +29,8 @@ REQUIRED_KEYS = [
 def parse_eventdt(v: str):
     # Our ETL uses SAFE.PARSE_TIMESTAMP('%Y-%m-%dT%H:%M:%E*S', ...)
     # Python's fromisoformat handles YYYY-MM-DDTHH:MM:SS and fractional seconds.
+    if v.endswith("Z"):
+        v = v.replace("Z", "+00:00")
     return datetime.fromisoformat(v)
 
 

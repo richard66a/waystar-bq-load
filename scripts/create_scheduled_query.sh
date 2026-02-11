@@ -1,16 +1,33 @@
 #!/usr/bin/env bash
 set -euo pipefail
+IFS=$'\n\t'
 
 # create_scheduled_query.sh
 # Builds the JSON params for a scheduled query using the SQL in sql/06_scheduled_query_etl.sql
 # and either prints the exact `bq mk` command to run or executes it (if --apply is passed).
 
-SQL_FILE="$(dirname "$0")/../sql/06_scheduled_query_etl_scheduled.sql"
-CALL_SQL_FILE="$(dirname "$0")/../sql/06_scheduled_query_call.sql"
-PROJECT="sbox-ravelar-001-20250926"
-DATASET="logviewer"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SQL_FILE="${SCRIPT_DIR}/../sql/06_scheduled_query_etl_scheduled.sql"
+CALL_SQL_FILE="${SCRIPT_DIR}/../sql/06_scheduled_query_call.sql"
+
+# Load optional config defaults
+if [ -f "${SCRIPT_DIR}/../config/settings.sh" ]; then
+  # shellcheck disable=SC1091
+  source "${SCRIPT_DIR}/../config/settings.sh"
+fi
+
+PROJECT="${PROJECT_ID:-your-gcp-project-id}"
+DATASET="${DATASET_ID:-logviewer}"
 DISPLAY_NAME="FTPlog ETL (every 5m)"
-SCHEDULE="every 5 minutes"
+SCHEDULE="${SCHEDULED_QUERY_SCHEDULE:-every 5 minutes}"
+
+if command -v require_cmd >/dev/null 2>&1; then
+  require_cmd jq
+  require_cmd bq
+else
+  command -v jq >/dev/null 2>&1 || { echo "Missing required command: jq" >&2; exit 2; }
+  command -v bq >/dev/null 2>&1 || { echo "Missing required command: bq" >&2; exit 2; }
+fi
 
 usage(){
   cat <<EOF

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # =============================================================================
 # FTP Log Pipeline - Run ETL Manually
 # =============================================================================
@@ -10,11 +10,14 @@
 #   ./run_etl.sh
 # =============================================================================
 
-set -e
+set -euo pipefail
+IFS=$'\n\t'
 
 # Load configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../config/settings.sh"
+
+require_cmd bq
 
 echo "=============================================================="
 echo "FTP Log Pipeline - Manual ETL Execution"
@@ -35,6 +38,8 @@ UNPROCESSED=$(bq query --use_legacy_sql=false --format=csv --quiet \
          SELECT 1 FROM \`${FQ_PROCESSED_TABLE}\` pf
          WHERE pf.gcs_uri = _FILE_NAME
      )" 2>/dev/null | tail -1)
+
+UNPROCESSED="${UNPROCESSED:-0}"
 
 log_info "Unprocessed files found: ${UNPROCESSED}"
 

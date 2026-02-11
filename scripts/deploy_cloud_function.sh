@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # =============================================================================
 # FTP Log Pipeline - Deploy Cloud Function (Alternative to Scheduled Query)
 # =============================================================================
@@ -10,11 +10,16 @@
 #   ./deploy_cloud_function.sh
 # =============================================================================
 
-set -e
+set -euo pipefail
+IFS=$'\n\t'
 
 # Load configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../config/settings.sh"
+
+require_cmd gcloud
+require_cmd bq
+require_cmd gsutil
 
 echo "=============================================================="
 echo "FTP Log Pipeline - Cloud Function Deployment"
@@ -55,7 +60,7 @@ gcloud functions deploy "${CLOUD_FUNCTION_NAME}" \
     --service-account="${SERVICE_ACCOUNT_EMAIL}" \
     --memory="${CLOUD_FUNCTION_MEMORY}" \
     --timeout="${CLOUD_FUNCTION_TIMEOUT}" \
-    --set-env-vars="PROJECT_ID=${PROJECT_ID}"
+    --set-env-vars="PROJECT_ID=${PROJECT_ID},DATASET_ID=${DATASET_ID},GCS_LOGS_PREFIX=${GCS_LOGS_PREFIX}"
 
 log_success "Cloud Function deployed!"
 

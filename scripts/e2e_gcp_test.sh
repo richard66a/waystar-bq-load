@@ -9,7 +9,7 @@ PATH_PREFIX="${PATH_PREFIX:-logs}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SQL_DIR="${SCRIPT_DIR}/../sql"
 
-DEFAULT_SAMPLE_FILE="${SCRIPT_DIR}/../../Waystar-20260203-1212568611-9b9dc78e-4f1a-4d03-881c-0104a5352ccf.json"
+DEFAULT_SAMPLE_FILE="${SCRIPT_DIR}/../tests/sample_data/FTP-SERVER-01-20260128-103000001-test-sample-001.json"
 SAMPLE_FILE="${SAMPLE_FILE:-${DEFAULT_SAMPLE_FILE}}"
 
 if [[ ! -f "${SAMPLE_FILE}" ]]; then

@@ -25,6 +25,7 @@ import uuid
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 import hashlib
+from datetime import timezone
 
 
 # =============================================================================
@@ -109,13 +110,11 @@ def generate_session_id() -> str:
 
 
 def compute_hash_code(data: str) -> int:
-    """Compute a hash code similar to .NET GetHashCode()."""
-    # Use MD5 and take first 8 hex chars as signed 32-bit int
-    hash_bytes = hashlib.md5(data.encode()).hexdigest()[:8]
-    value = int(hash_bytes, 16)
-    # Convert to signed 32-bit integer
-    if value >= 2**31:
-        value -= 2**32
+    """Compute a deterministic signed 64-bit hash code."""
+    digest = hashlib.sha256(data.encode("utf-8")).digest()
+    value = int.from_bytes(digest[:8], byteorder="big", signed=False)
+    if value >= 2**63:
+        value -= 2**64
     return value
 
 
@@ -165,9 +164,17 @@ def generate_ftp_event(
         filename = "-"
         bytes_transferred = 0
     
+    # Normalize to UTC for consistent EventDt
+    if event_dt.tzinfo is None:
+        event_dt_utc = event_dt.replace(tzinfo=timezone.utc)
+    else:
+        event_dt_utc = event_dt.astimezone(timezone.utc)
+
+    event_dt_text = event_dt_utc.isoformat(timespec="milliseconds").replace("+00:00", "Z")
+
     # Generate raw data line
     raw_data = (
-        f"{event_dt.strftime('%Y-%m-%d %H:%M:%S')} "
+        f"{event_dt_utc.strftime('%Y-%m-%d %H:%M:%S')} "
         f"{generate_ip_address()} "
         f"{user_name} "
         f"{action.upper()} "
@@ -180,7 +187,7 @@ def generate_ftp_event(
         "UserName": user_name,
         "CustId": cust_id,
         "PartnerName": partner_name,
-        "EventDt": event_dt.strftime("%Y-%m-%dT%H:%M:%S"),
+        "EventDt": event_dt_text,
         "Action": action,
         "Filename": filename,
         "SessionId": generate_session_id(),
@@ -269,7 +276,9 @@ def generate_test_files(
     os.makedirs(output_dir, exist_ok=True)
     
     if start_date is None:
-        start_date = datetime.now()
+        start_date = datetime.now(timezone.utc)
+    elif start_date.tzinfo is None:
+        start_date = start_date.replace(tzinfo=timezone.utc)
     
     generated_files = []
     

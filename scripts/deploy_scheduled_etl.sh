@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # =============================================================================
 # FTP Log Pipeline - Deploy Scheduled ETL (Cloud Scheduler + HTTP Function)
 # =============================================================================
@@ -10,11 +10,15 @@
 #   ./scripts/deploy_scheduled_etl.sh
 # =============================================================================
 
-set -e
+set -euo pipefail
+IFS=$'\n\t'
 
 # Load configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../config/settings.sh"
+
+require_cmd gcloud
+require_cmd bq
 
 echo "=============================================================="
 echo "FTP Log Pipeline - Scheduled ETL Deployment"
@@ -48,7 +52,7 @@ gcloud functions deploy "${SCHEDULED_ETL_FUNCTION_NAME}" \
     --service-account="${SERVICE_ACCOUNT_EMAIL}" \
     --memory="${CLOUD_FUNCTION_MEMORY}" \
     --timeout="${CLOUD_FUNCTION_TIMEOUT}" \
-    --set-env-vars="PROJECT_ID=${PROJECT_ID}"
+    --set-env-vars="PROJECT_ID=${PROJECT_ID},DATASET_ID=${DATASET_ID},GCS_LOGS_PREFIX=${GCS_LOGS_PREFIX}"
 
 log_success "Scheduled ETL Cloud Function deployed."
 

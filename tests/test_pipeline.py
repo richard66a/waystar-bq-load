@@ -23,7 +23,7 @@ import subprocess
 import tempfile
 import time
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, List, Dict, Tuple
 import hashlib
 
@@ -70,6 +70,15 @@ def run_command(cmd: str, capture: bool = True) -> Tuple[int, str, str]:
     return result.returncode, result.stdout, result.stderr
 
 
+def compute_hash_code(canonical: str) -> int:
+    """Compute deterministic signed 64-bit hash_code from canonical string."""
+    digest = hashlib.sha256(canonical.encode("utf-8")).digest()
+    value = int.from_bytes(digest[:8], byteorder="big", signed=False)
+    if value >= 2**63:
+        value -= 2**64
+    return value
+
+
 def run_bq_query(query: str, project: str) -> Tuple[bool, str]:
     """Run a BigQuery query and return success status and output."""
     cmd = f'bq query --use_legacy_sql=false --project_id={project} --format=json "{query}"'
@@ -78,15 +87,21 @@ def run_bq_query(query: str, project: str) -> Tuple[bool, str]:
 
 
 class PipelineTest:
-    """Base class for pipeline tests."""
-    
-    def __init__(self, project: str, bucket: str, dataset: str):
+    """Base class for pipeline tests.
+
+    NOTE: pytest will not collect classes that define an `__init__` constructor.
+    To keep the test classes collectable by pytest we expose a `configure`
+    method that callers (including the test runner below) should call after
+    instantiation to set per-run configuration.
+    """
+
+    def configure(self, project: str, bucket: str, dataset: str):
         self.project = project
         self.bucket = bucket
         self.dataset = dataset
         self.test_id = f"test-{uuid.uuid4().hex[:8]}"
         self.test_files: List[str] = []
-    
+
     def setup(self):
         """Setup before test."""
         pass
@@ -168,11 +183,13 @@ class TestFileProcessing(PipelineTest):
         # Create test data
         test_events = []
         for i in range(5):
+            event_dt = (datetime.now(timezone.utc) - timedelta(minutes=i))
+            event_dt_text = event_dt.isoformat(timespec="milliseconds").replace("+00:00", "Z")
             event = {
                 "UserName": f"{10000 + i}",
                 "CustId": 10000 + i,
                 "PartnerName": None,
-                "EventDt": (datetime.now() - timedelta(minutes=i)).strftime("%Y-%m-%dT%H:%M:%S"),
+                "EventDt": event_dt_text,
                 "Action": "Store",
                 "Filename": f"/uploads/test_{i}.txt",
                 "SessionId": f"sess-{self.test_id}-{i}",
@@ -182,7 +199,9 @@ class TestFileProcessing(PipelineTest):
                 "StatusCode": 226,
                 "ServerResponse": "Test successful",
                 "RawData": f"test raw data {i}",
-                "HashCode": hash(f"{self.test_id}-{i}") % (2**31),
+                "HashCode": compute_hash_code(
+                    f"{event_dt_text}|FTP-TEST|/uploads/test_{i}.txt|{1024 * (i + 1)}|{10000 + i}"
+                ),
             }
             test_events.append(json.dumps(event))
         
@@ -390,7 +409,8 @@ def run_all_tests(project: str, bucket: str, dataset: str) -> bool:
         print(f"\n{Colors.BOLD}Test: {name}{Colors.RESET}")
         print("-" * 40)
         
-        test = test_class(project, bucket, dataset)
+        test = test_class()
+        test.configure(project, bucket, dataset)
         try:
             test.setup()
             passed = test.run()

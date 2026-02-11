@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # =============================================================================
 # FTP Log Pipeline - Quick Start Script
 # =============================================================================
@@ -9,10 +9,20 @@
 #   ./quickstart.sh
 # =============================================================================
 
-set -e
+set -euo pipefail
+IFS=$'\n\t'
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "${SCRIPT_DIR}"
+
+# Load configuration early for helper functions
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/config/settings.sh"
+
+require_cmd gcloud
+require_cmd bq
+require_cmd gsutil
+require_cmd python3
 
 echo "=============================================================="
 echo "FTP Log Pipeline - Quick Start"
@@ -51,7 +61,6 @@ python3 tests/generate_test_data.py \
 echo ""
 echo "Step 3: Uploading test data to GCS..."
 echo "------------------------------------------------------------"
-source config/settings.sh
 gsutil cp ./test_files/*.json "gs://${GCS_BUCKET}/${GCS_LOGS_PREFIX}/"
 
 # Step 4: Run ETL
