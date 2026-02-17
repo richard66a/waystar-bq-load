@@ -51,13 +51,7 @@ INSERT INTO `__PROJECT_ID__.__DATASET_ID__.base_ftplog`
     event_dt,
     filename,
     hash_code,
-    TO_HEX(SHA256(CONCAT(
-        COALESCE(JSON_VALUE(ext.data, '$.EventDt'), ''), '|',
-        COALESCE(JSON_VALUE(ext.data, '$.Source'), ''), '|',
-        COALESCE(JSON_VALUE(ext.data, '$.Filename'), ''), '|',
-        COALESCE(JSON_VALUE(ext.data, '$.Bytes'), ''), '|',
-        COALESCE(JSON_VALUE(ext.data, '$.UserName'), '')
-    ))) AS hash_fingerprint,
+    hash_fingerprint,
     ip_address,
     partner_name,
     session_id,
@@ -80,6 +74,13 @@ SELECT
     SAFE.PARSE_TIMESTAMP('%Y-%m-%dT%H:%M:%E*S', JSON_VALUE(ext.data, '$.EventDt')) AS event_dt,
     JSON_VALUE(ext.data, '$.Filename') AS filename,
     SAFE_CAST(JSON_VALUE(ext.data, '$.HashCode') AS INT64) AS hash_code,
+    TO_HEX(SHA256(CONCAT(
+        COALESCE(JSON_VALUE(ext.data, '$.EventDt'), ''), '|',
+        COALESCE(JSON_VALUE(ext.data, '$.Source'), ''), '|',
+        COALESCE(JSON_VALUE(ext.data, '$.Filename'), ''), '|',
+        COALESCE(JSON_VALUE(ext.data, '$.Bytes'), ''), '|',
+        COALESCE(JSON_VALUE(ext.data, '$.UserName'), '')
+    ))) AS hash_fingerprint,
     JSON_VALUE(ext.data, '$.IpAddress') AS ip_address,
     JSON_VALUE(ext.data, '$.PartnerName') AS partner_name,
     JSON_VALUE(ext.data, '$.SessionId') AS session_id,
@@ -156,63 +157,8 @@ USING (
             ) AS rows_loaded
         FROM _file_stats fs
     ) fl
-    WITH candidate AS (
-        SELECT
-            CURRENT_TIMESTAMP() AS load_time_dt,
-            COALESCE(
-                SAFE.PARSE_TIMESTAMP('%Y-%m-%dT%H:%M:%E*S', JSON_VALUE(ext.data, '$.EventDt')),
-                CURRENT_TIMESTAMP()
-            ) AS source_file_dt,
-            nf.originating_filename,
-            ext._FILE_NAME AS gcs_uri,
-            JSON_VALUE(ext.data, '$.Action') AS action,
-            SAFE_CAST(JSON_VALUE(ext.data, '$.Bytes') AS INT64) AS bytes,
-            SAFE_CAST(JSON_VALUE(ext.data, '$.CustId') AS INT64) AS cust_id,
-            SAFE.PARSE_TIMESTAMP('%Y-%m-%dT%H:%M:%E*S', JSON_VALUE(ext.data, '$.EventDt')) AS event_dt,
-            JSON_VALUE(ext.data, '$.Filename') AS filename,
-            SAFE_CAST(JSON_VALUE(ext.data, '$.HashCode') AS INT64) AS hash_code,
-            TO_HEX(SHA256(CONCAT(
-                COALESCE(JSON_VALUE(ext.data, '$.EventDt'), ''), '|',
-                COALESCE(JSON_VALUE(ext.data, '$.Source'), ''), '|',
-                COALESCE(JSON_VALUE(ext.data, '$.Filename'), ''), '|',
-                COALESCE(JSON_VALUE(ext.data, '$.Bytes'), ''), '|',
-                COALESCE(JSON_VALUE(ext.data, '$.UserName'), '')
-            ))) AS hash_fingerprint,
-            JSON_VALUE(ext.data, '$.IpAddress') AS ip_address,
-            JSON_VALUE(ext.data, '$.PartnerName') AS partner_name,
-            JSON_VALUE(ext.data, '$.SessionId') AS session_id,
-            JSON_VALUE(ext.data, '$.Source') AS source,
-            JSON_VALUE(ext.data, '$.UserName') AS user_name,
-            JSON_VALUE(ext.data, '$.ServerResponse') AS server_response,
-            JSON_VALUE(ext.data, '$.RawData') AS raw_data
-        FROM `__PROJECT_ID__.__DATASET_ID__.external_ftplog_files` ext
-        INNER JOIN _new_files nf
-            ON ext._FILE_NAME = nf.file_path
-        WHERE
-            ext.data IS NOT NULL
-            AND TRIM(ext.data) != ''
-            AND STARTS_WITH(TRIM(ext.data), '{')
-    )
-    SELECT
-        c.load_time_dt,
-        c.source_file_dt,
-        c.originating_filename,
-        c.gcs_uri,
-        c.action,
-        c.bytes,
-        c.cust_id,
-        c.event_dt,
-        c.filename,
-        c.hash_code,
-        c.hash_fingerprint,
-        c.ip_address,
-        c.partner_name,
-        c.session_id,
-        c.source,
-        c.user_name,
-        c.server_response,
-        c.raw_data
-    FROM candidate c
-    LEFT JOIN `__PROJECT_ID__.__DATASET_ID__.base_ftplog` b
-        ON b.hash_fingerprint = c.hash_fingerprint
-    WHERE b.hash_fingerprint IS NULL;
+) AS source
+ON target.gcs_uri = source.gcs_uri
+WHEN NOT MATCHED THEN
+    INSERT (gcs_uri, originating_filename, processed_timestamp, rows_loaded, rows_expected, parse_errors, status, error_message, processing_duration_seconds)
+    VALUES (source.gcs_uri, source.originating_filename, source.processed_timestamp, source.rows_loaded, source.rows_expected, source.parse_errors, source.status, source.error_message, source.processing_duration_seconds);
