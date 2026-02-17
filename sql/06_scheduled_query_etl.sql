@@ -1,17 +1,29 @@
 -- =============================================================================
 -- FTP Log Pipeline - ETL Query
 -- =============================================================================
--- This version can be run manually or via scheduled query.
+-- Purpose: Idempotent ETL that parses raw NDJSON FTP log files (external table),
+--          loads structured rows into `base_ftplog`, archives raw JSON, and
+--          writes an entry into `processed_files` ledger.
 --
--- Usage (scheduled query body):
---   bq query --use_legacy_sql=false < 06_scheduled_query_etl.sql
+-- Execution: safe to run manually (`bq query --use_legacy_sql=false < this_file`)
+--            or as a BigQuery Scheduled Query. The script is DML-only and
+--            designed to be idempotent: repeated runs will not double-load
+--            already-processed files because `processed_files` is used as the
+--            source-of-truth for which files have been handled.
+--
+-- Conventions:
+--  - `external_ftplog_files` is an external (or staging) table with a `_FILE_NAME`
+--    column and a `data` column with one JSON object per row.
+--  - `hash_fingerprint` is computed deterministically to detect duplicates
+--    across files/rows using a SHA256 over canonical fields.
 -- =============================================================================
 
 -- =============================================================================
 -- STEP 1: Identify new files not yet processed
 -- =============================================================================
 DECLARE run_started TIMESTAMP DEFAULT CURRENT_TIMESTAMP();
-
+-- Create a small temp table of distinct GCS file paths that are not already
+-- recorded in `processed_files`. This prevents re-processing the same file.
 CREATE TEMP TABLE _new_files AS
 SELECT DISTINCT
     _FILE_NAME AS file_path,
@@ -25,6 +37,8 @@ WHERE _FILE_NAME IS NOT NULL
   );
 
 -- Capture expected row counts per file (non-empty lines)
+-- Count the number of non-empty lines (rows) per file so we can
+-- validate how many rows we expect versus how many actually load.
 CREATE TEMP TABLE _file_stats AS
 SELECT
     nf.file_path,
@@ -38,6 +52,11 @@ GROUP BY nf.file_path, nf.originating_filename;
 -- =============================================================================
 -- STEP 2: Parse and load structured data into base table
 -- =============================================================================
+-- Notes:
+--  - The INSERT column list must be plain column names (expressions belong
+--    in the SELECT projection below).
+--  - `hash_fingerprint` is computed in the SELECT using a stable concat of
+--    key fields then hashed with SHA256 and hex-encoded. This helps dedupe.
 INSERT INTO `__PROJECT_ID__.__DATASET_ID__.base_ftplog`
 (
     load_time_dt,
@@ -73,6 +92,7 @@ SELECT
     SAFE.PARSE_TIMESTAMP('%Y-%m-%dT%H:%M:%E*S', JSON_VALUE(ext.data, '$.EventDt')) AS event_dt,
     JSON_VALUE(ext.data, '$.Filename') AS filename,
     SAFE_CAST(JSON_VALUE(ext.data, '$.HashCode') AS INT64) AS hash_code,
+    -- hash_fingerprint: deterministic fingerprint across a set of fields
     TO_HEX(SHA256(CONCAT(
         COALESCE(JSON_VALUE(ext.data, '$.EventDt'), ''), '|',
         COALESCE(JSON_VALUE(ext.data, '$.Source'), ''), '|',
@@ -96,8 +116,9 @@ WHERE
     AND STARTS_WITH(TRIM(ext.data), '{');
 
 -- =============================================================================
--- STEP 3: Archive raw JSON for compliance and recovery
+-- STEP 3: Archive raw JSON
 -- =============================================================================
+-- Persist the original raw JSON payloads for audit, replay, or debugging.
 INSERT INTO `__PROJECT_ID__.__DATASET_ID__.archive_ftplog`
 (
     raw_json,
@@ -120,8 +141,11 @@ WHERE
     AND TRIM(ext.data) != '';
 
 -- =============================================================================
--- STEP 4: Mark files as processed (idempotent)
+-- STEP 4: Mark files as processed
 -- =============================================================================
+-- We use MERGE so an existing entry (same gcs_uri) will not
+-- create duplicates. The ledger records rows expected vs rows loaded and a
+-- simple `status` to indicate SUCCESS, PARTIAL, or FAILED.
 MERGE `__PROJECT_ID__.__DATASET_ID__.processed_files` AS target
 USING (
     SELECT
@@ -131,12 +155,14 @@ USING (
         fl.rows_loaded,
         fl.rows_expected,
         GREATEST(fl.rows_expected - fl.rows_loaded, 0) AS parse_errors,
+        -- status: simple health indicator for the file processing
         CASE
             WHEN fl.rows_expected = 0 THEN 'FAILED'
             WHEN fl.rows_loaded = 0 THEN 'FAILED'
             WHEN GREATEST(fl.rows_expected - fl.rows_loaded, 0) > 0 THEN 'PARTIAL'
             ELSE 'SUCCESS'
         END AS status,
+        -- user-friendly message to capture parse/row-count issues
         CASE
             WHEN fl.rows_expected = 0 THEN 'No non-empty rows found in file'
             WHEN fl.rows_loaded = 0 THEN 'No rows loaded from file'
